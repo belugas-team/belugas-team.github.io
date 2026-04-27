@@ -406,7 +406,7 @@ function renderLeaderboard() {
       <thead><tr><th>#</th><th>Athlete</th><th>Total</th><th>Avg/d</th><th>Best</th></tr></thead>
       <tbody>${NAMES.map((n,i)=>{
         const cnt=nameCounts[n], pct=((cnt/max)*100).toFixed(0);
-        const dc=dailyCounts(n), ad=Object.keys(dc).length;
+        const dc=dailyCounts(n);
         const best=Math.max(...Object.values(dc));
         const rc=rankClass[i]||'rn', c=COLORS[n];
         return `<tr>
@@ -416,7 +416,7 @@ function renderLeaderboard() {
             <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div>
           </td>
           <td style="font-weight:700;color:${c}">${cnt}</td>
-          <td style="color:var(--muted)">${(cnt/ad).toFixed(1)}</td>
+          <td style="color:var(--muted)">${(cnt/ALL_DATES.length).toFixed(2)}</td>
           <td style="color:var(--muted)">${best}</td>
         </tr>`;
       }).join('')}</tbody>
@@ -723,7 +723,7 @@ function selectProfile(name, idx) {
           [st.current+'d','Cur. Streak'],
           [ad,'Active Days'],
           [best,'Best Day'],
-          [((nameCounts[name]/ad)||0).toFixed(1),'Avg / Day']
+          [(nameCounts[name]/ALL_DATES.length).toFixed(2),'Avg / Day']
         ].map(([v,l])=>`<div class="p-stat"><div class="p-stat-val" style="color:${color}">${v}</div><div class="p-stat-lbl">${l}</div></div>`).join('')}
       </div>
     </div>
