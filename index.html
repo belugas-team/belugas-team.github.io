@@ -283,11 +283,14 @@ const maxTs = Math.max(...events.map(e=>e.date));
 const minDate = new Date(minTs); minDate.setHours(0,0,0,0);
 const maxDate = new Date(maxTs); maxDate.setHours(23,59,59,999);
 
-// All dates in range
+// All dates in chat range (for charts)
 const ALL_DATES = [];
 { let d = new Date(minDate);
   while (d <= maxDate) { ALL_DATES.push(d.toISOString().substring(0,10)); d.setDate(d.getDate()+1); }
 }
+// Full season: Jan 1 2026 → last event (headstarts begin Jan 1)
+const SEASON_START = new Date('2026-01-01');
+const SEASON_DAYS = Math.floor((maxDate - SEASON_START) / 86400000) + 1;
 
 // ─── ANALYTICS ──────────────────────────────────────────────────────────────
 function eventsFor(name) { return name ? events.filter(e=>e.name===name) : events; }
@@ -365,8 +368,7 @@ function renderKPIs() {
   const maxDayVal = Math.max(...dvals);
   const bestDateStr = Object.keys(dc).find(d=>dc[d]===maxDayVal)||'';
 
-  const totalDays = ALL_DATES.length;
-  const avgDay = (total/totalDays).toFixed(1);
+  const avgDay = (total/SEASON_DAYS).toFixed(1);
 
   let bestPerson = {name:'',count:0};
   NAMES.forEach(n=>{
@@ -376,6 +378,7 @@ function renderKPIs() {
 
   const activeDays = Object.keys(dc).length;
   const totalPooers = NAMES.length;
+  const totalDays = SEASON_DAYS;
 
   const kpis=[
     {icon:'💩',val:total.toLocaleString(),lbl:'Total Poos',sub:`${totalPooers} athletes`},
@@ -416,7 +419,7 @@ function renderLeaderboard() {
             <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div>
           </td>
           <td style="font-weight:700;color:${c}">${cnt}</td>
-          <td style="color:var(--muted)">${(cnt/ALL_DATES.length).toFixed(2)}</td>
+          <td style="color:var(--muted)">${(cnt/SEASON_DAYS).toFixed(2)}</td>
           <td style="color:var(--muted)">${best}</td>
         </tr>`;
       }).join('')}</tbody>
@@ -723,7 +726,7 @@ function selectProfile(name, idx) {
           [st.current+'d','Cur. Streak'],
           [ad,'Active Days'],
           [best,'Best Day'],
-          [(nameCounts[name]/ALL_DATES.length).toFixed(2),'Avg / Day']
+          [(nameCounts[name]/SEASON_DAYS).toFixed(2),'Avg / Day']
         ].map(([v,l])=>`<div class="p-stat"><div class="p-stat-val" style="color:${color}">${v}</div><div class="p-stat-lbl">${l}</div></div>`).join('')}
       </div>
     </div>
