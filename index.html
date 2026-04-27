@@ -160,6 +160,27 @@
       transition: transform .15s, border-color .15s;
     }
     .medal-card:hover { transform: translateY(-2px); }
+    .medal-card { position: relative; }
+    .medal-info {
+      position: absolute; top: 8px; right: 8px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #2a2a2a; color: #666;
+      font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      cursor: help; flex-shrink: 0;
+      transition: background .15s, color .15s;
+    }
+    .medal-info:hover { background: #444; color: #ccc; }
+    .medal-info-tip {
+      display: none;
+      position: absolute; top: 26px; right: 0;
+      width: 200px;
+      background: #1e1e1e; border: 1px solid #3a3a3a;
+      border-radius: 7px; padding: 8px 10px;
+      font-size: 11px; color: #aaa; line-height: 1.5;
+      z-index: 500; pointer-events: none;
+    }
+    .medal-info:hover .medal-info-tip { display: block; }
     .medal-icon {
       font-size: 30px;
       flex-shrink: 0;
@@ -815,37 +836,155 @@ function fmtHour(h) {
 }
 
 function dailyStdDev(name) {
-  // Std dev of poos-per-day, only days with data
   const vals = Object.values(dailyCounts(name));
   if (vals.length < 2) return 0;
   const mean = vals.reduce((a,b)=>a+b,0)/vals.length;
   return Math.sqrt(vals.reduce((a,b)=>a+(b-mean)**2,0)/vals.length);
 }
 
+function pooPartners() {
+  const byDay = {};
+  events.forEach(e => { if(!byDay[e.ds]) byDay[e.ds]=[]; byDay[e.ds].push(e); });
+
+  const pairClosest = {}; // key -> [min gap per shared day]
+  Object.values(byDay).forEach(dayEvts => {
+    // Group events by person within this day
+    const byPerson = {};
+    dayEvts.forEach(e => { if(!byPerson[e.name]) byPerson[e.name]=[]; byPerson[e.name].push(e.date.getTime()); });
+    const people = Object.keys(byPerson);
+    for(let i=0;i<people.length;i++) for(let j=i+1;j<people.length;j++) {
+      const key=[people[i],people[j]].sort().join('||');
+      // Find the minimum gap between any event of person i and any event of person j
+      let minGap = Infinity;
+      byPerson[people[i]].forEach(ta => byPerson[people[j]].forEach(tb => {
+        const gap = Math.abs(ta-tb)/60000;
+        if(gap < minGap) minGap = gap;
+      }));
+      if(!pairClosest[key]) pairClosest[key]=[];
+      pairClosest[key].push(minGap);
+    }
+  });
+
+  let best={key:'',avg:Infinity,count:0};
+  Object.entries(pairClosest).forEach(([key,gaps])=>{
+    if(gaps.length<10) return;
+    const avg=gaps.reduce((a,b)=>a+b,0)/gaps.length;
+    if(avg<best.avg) best={key,avg,count:gaps.length};
+  });
+  const [n1,n2]=best.key.split('||');
+  return {n1,n2,avgMins:best.avg,count:best.count};
+}
+
+function chainStarter() {
+  const triggered={}, total={};
+  events.forEach(e=>{
+    total[e.name]=(total[e.name]||0)+1;
+    const t0=e.date.getTime();
+    const fires=events.some(e2=>e2.name!==e.name&&e2.date.getTime()>t0&&e2.date.getTime()-t0<=3600000);
+    if(fires) triggered[e.name]=(triggered[e.name]||0)+1;
+  });
+  const best=NAMES.reduce((b,n)=>{
+    if((total[n]||0)<20) return b;
+    const rate=(triggered[n]||0)/(total[n]||1);
+    return rate>b.rate?{name:n,rate,count:triggered[n]||0}:b;
+  },{name:'',rate:-Infinity,count:0});
+  return best;
+}
+
+function loneWolf() {
+  const solo={};
+  events.forEach(e=>{
+    const t0=e.date.getTime();
+    const hasBuddy=events.some(e2=>e2.name!==e.name&&Math.abs(e2.date.getTime()-t0)<=7200000);
+    if(!hasBuddy) solo[e.name]=(solo[e.name]||0)+1;
+  });
+  const best=NAMES.reduce((b,n)=>(solo[n]||0)>(solo[b]||0)?n:b,NAMES[0]);
+  return {name:best,count:solo[best]||0};
+}
+
+function weekendWarrior() {
+  const we={},wd={};
+  events.forEach(e=>{
+    const dow=e.date.getDay();
+    if(dow===0||dow===6) we[e.name]=(we[e.name]||0)+1;
+    else wd[e.name]=(wd[e.name]||0)+1;
+  });
+  const best=NAMES.reduce((b,n)=>{
+    const ratio=((we[n]||0)/2)/((wd[n]||1)/5);
+    return ratio>b.ratio?{name:n,ratio,we:we[n]||0,wd:wd[n]||0}:b;
+  },{name:'',ratio:-Infinity});
+  return best;
+}
+
+function onFire() {
+  const mid=ALL_DATES[Math.floor(ALL_DATES.length/2)];
+  const best=NAMES.reduce((b,n)=>{
+    const dc=dailyCounts(n);
+    const firstHalf=Object.entries(dc).filter(([d])=>d<mid).map(([,v])=>v);
+    const secHalf=Object.entries(dc).filter(([d])=>d>=mid).map(([,v])=>v);
+    if(!firstHalf.length||!secHalf.length) return b;
+    const avg1=firstHalf.reduce((a,v)=>a+v,0)/firstHalf.length;
+    const avg2=secHalf.reduce((a,v)=>a+v,0)/secHalf.length;
+    const growth=avg2-avg1;
+    return growth>b.growth?{name:n,growth,avg1,avg2}:b;
+  },{name:'',growth:-Infinity});
+  return best;
+}
+
+function machine() {
+  const best=NAMES.reduce((b,n)=>{
+    const vals=Object.values(dailyCounts(n));
+    if(vals.length<5) return b;
+    const mean=vals.reduce((a,v)=>a+v,0)/vals.length;
+    const std=Math.sqrt(vals.reduce((a,v)=>a+(v-mean)**2,0)/vals.length);
+    const cv=std/mean;
+    return cv<b.cv?{name:n,cv,mean}:b;
+  },{name:'',cv:Infinity});
+  return best;
+}
+
 function renderMedals() {
   const w1 = bestInWindow(1), w2 = bestInWindow(2), w3 = bestInWindow(3);
-
   const {earlyBird, nightOwl} = earlyLateStats();
-  const variable = NAMES.reduce((b,n)=>{ const v=dailyStdDev(n); return v>b.v?{name:n,v}:b; },{name:'',v:-Infinity});
+  const variable  = NAMES.reduce((b,n)=>{ const v=dailyStdDev(n); return v>b.v?{name:n,v}:b; },{name:'',v:-Infinity});
+  const partners  = pooPartners();
+  const chain     = chainStarter();
+  const wolf      = loneWolf();
+  const warrior   = weekendWarrior();
+  const fire      = onFire();
+  const mach      = machine();
+
+  const partnerColor = partners.n1 ? COLORS[partners.n1] : '#fff';
+  const partnerName  = partners.n1 ? `${partners.n1} & ${partners.n2}` : '—';
 
   const medals = [
-    { icon:'⚡', title:'Corta-Heces', name:w1.name, stat:`${w1.count} poos in 1 hour`, color:'#ff6b35' },
-    { icon:'🚀', title:'2h Blitz',    name:w2.name, stat:`${w2.count} poos in 2 hours`, color:'#4ecdc4' },
-    { icon:'💪', title:'3h Beast',    name:w3.name, stat:`${w3.count} poos in 3 hours`, color:'#ffe66d' },
-    { icon:'🌅', title:'Early Bird',  name:earlyBird.name, stat:`First of the day ${earlyBird.count}×`, color:'#a8e6cf' },
-    { icon:'🌙', title:'Night Owl',   name:nightOwl.name,  stat:`Last of the day ${nightOwl.count}×`, color:'#b8b8ff' },
-    { icon:'🎲', title:'Wild Card',   name:variable.name,  stat:`±${variable.v.toFixed(1)} poos/day`, color:'#ff8b94' },
+    { icon:'⚡', title:'Corta-Heces',     name:w1.name,       stat:`${w1.count} poos in 1h`,                      info:'Most poos logged within any single 1-hour window.' },
+    { icon:'🚀', title:'2h Blitz',        name:w2.name,       stat:`${w2.count} poos in 2h`,                      info:'Most poos logged within any single 2-hour window.' },
+    { icon:'💪', title:'3h Beast',        name:w3.name,       stat:`${w3.count} poos in 3h`,                      info:'Most poos logged within any single 3-hour window.' },
+    { icon:'🌅', title:'Early Bird',      name:earlyBird.name,stat:`First of day ${earlyBird.count}×`,            info:'Who is most often the first person in the group to poop each day (day resets at 6am).' },
+    { icon:'🌙', title:'Night Owl',       name:nightOwl.name, stat:`Last of day ${nightOwl.count}×`,              info:'Who is most often the last person in the group to poop each day (day resets at 6am).' },
+    { icon:'🎲', title:'Wild Card',       name:variable.name, stat:`±${variable.v.toFixed(1)} poos/day`,         info:'Highest std deviation of daily poo count — the most unpredictable pooper.' },
+    { icon:'💑', title:'Poo Partners',    name:partnerName,   stat:`avg ${Math.round(partners.avgMins)}min apart`, info:'Pair with the smallest average closest-encounter gap on days they both pooped (min. 10 shared days).', color: partnerColor },
+    { icon:'🔗', title:'Chain Reaction',  name:chain.name,    stat:`${(chain.rate*100).toFixed(0)}% trigger rate`,info:'% of their poos followed by someone else pooping within 1h. Min. 20 poos to qualify.' },
+    { icon:'🐺', title:'Lone Wolf',       name:wolf.name,     stat:`${wolf.count} solo poos`,                     info:'Most poos with nobody else pooping within 2 hours either side.' },
+    { icon:'🏄', title:'Weekend Warrior', name:warrior.name,  stat:`${warrior.ratio.toFixed(2)}× weekend rate`,   info:'Highest ratio of poos per weekend day vs poos per weekday (normalized for 2 vs 5 days).' },
+    { icon:'📈', title:'On Fire',         name:fire.name,     stat:`+${fire.growth.toFixed(2)} poos/day`,         info:'Biggest improvement: avg daily poos in the second half of the season vs the first half.' },
+    { icon:'🎯', title:'Machine',         name:mach.name,     stat:`CV ${(mach.cv*100).toFixed(0)}% consistency`, info:'Lowest coefficient of variation (std dev / mean) of daily poos — the most clockwork consistent.' },
   ];
 
-  document.getElementById('medals-grid').innerHTML = medals.map(m => `
-    <div class="medal-card" style="border-color:${COLORS[m.name]||'#333'}40">
-      <div class="medal-icon" style="background:${COLORS[m.name]||'#333'}20">${m.icon}</div>
+  document.getElementById('medals-grid').innerHTML = medals.map(m => {
+    const c = m.color || COLORS[m.name] || '#888';
+    return `
+    <div class="medal-card" style="border-color:${c}40">
+      <div class="medal-info">i<span class="medal-info-tip">${m.info}</span></div>
+      <div class="medal-icon" style="background:${c}20">${m.icon}</div>
       <div class="medal-body">
         <div class="medal-title">${m.title}</div>
-        <div class="medal-winner" style="color:${COLORS[m.name]||'#fff'}">${m.name}</div>
+        <div class="medal-winner" style="color:${c}">${m.name}</div>
         <div class="medal-stat">${m.stat}</div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
