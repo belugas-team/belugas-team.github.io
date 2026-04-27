@@ -1122,7 +1122,7 @@ function getMedalRanking(key) {
     }
     case 'earlybird': case 'nightowl': {
       const byDay={};
-      events.forEach(e=>{ if(!byDay[e.ds]) byDay[e.ds]=[]; byDay[e.ds].push(e); });
+      events.forEach(e=>{ const k=pooDayKey(e.date); if(!byDay[k]) byDay[k]=[]; byDay[k].push(e); });
       const counts={};
       Object.values(byDay).forEach(d=>{
         d.sort((a,b)=>a.date-b.date);
