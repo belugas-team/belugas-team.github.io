@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>💩 Poo Tracker 2026 — Triatlon Tetuan</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0d0d;
+      --surface: #161616;
+      --surface2: #1e1e1e;
+      --border: #2a2a2a;
+      --text: #efefef;
+      --muted: #777;
+      --orange: #ff6b35;
+      --card-radius: 10px;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #140800 0%, #1f0e00 100%);
+      border-bottom: 1px solid #ff6b3525;
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+    }
+    .header-brand { display: flex; flex-direction: column; gap: 2px; }
+    .header-title { font-size: 18px; font-weight: 700; color: var(--orange); letter-spacing: -0.3px; }
+    .header-sub { font-size: 11px; color: var(--muted); }
+    .main-tabs { display: flex; gap: 4px; }
+    .main-tab {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 7px 18px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all .15s;
+    }
+    .main-tab.active { background: var(--orange); border-color: var(--orange); color: #fff; }
+    .main-tab:hover:not(.active) { border-color: var(--orange); color: var(--orange); }
+    /* ── Layout ── */
+    .content { padding: 20px 24px 40px; max-width: 1440px; margin: 0 auto; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    /* ── KPI Grid ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      padding: 14px 16px;
+      cursor: default;
+      transition: transform .15s, border-color .15s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); border-color: var(--orange); }
+    .kpi-icon { font-size: 20px; margin-bottom: 6px; }
+    .kpi-value { font-size: 22px; font-weight: 700; color: var(--orange); line-height: 1.1; }
+    .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-top: 3px; }
+    .kpi-sub { font-size: 11px; color: #555; margin-top: 2px; }
+    /* ── Chart cards ── */
+    .row { display: grid; gap: 12px; margin-bottom: 12px; }
+    .row.c2 { grid-template-columns: 1fr 1fr; }
+    .row.c3 { grid-template-columns: 320px 1fr; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      padding: 18px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      margin-bottom: 14px;
+    }
+    .ch { position: relative; }
+    /* ── Leaderboard ── */
+    .lb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .lb-table th {
+      color: var(--muted); font-weight: 500; font-size: 10px;
+      text-transform: uppercase; letter-spacing: .5px;
+      padding: 6px 6px; border-bottom: 1px solid var(--border); text-align: left;
+    }
+    .lb-table td { padding: 9px 6px; border-bottom: 1px solid #1c1c1c; vertical-align: middle; }
+    .lb-table tr:last-child td { border-bottom: none; }
+    .rank-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 50%; font-weight: 700; font-size: 10px;
+    }
+    .r1 { background: #FFD700; color: #000; }
+    .r2 { background: #C0C0C0; color: #000; }
+    .r3 { background: #CD7F32; color: #000; }
+    .rn { background: #222; color: var(--muted); }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+    .bar-wrap { background: #222; border-radius: 2px; height: 3px; margin-top: 4px; }
+    .bar-fill { height: 3px; border-radius: 2px; }
+    /* ── Heatmap ── */
+    .hm-scroll { overflow-x: auto; padding-bottom: 4px; }
+    /* ── Profile tab ── */
+    .ptabs-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+    .ptab {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); padding: 7px 15px; border-radius: 20px;
+      cursor: pointer; font-size: 12px; font-weight: 500; transition: all .15s;
+    }
+    .ptab:hover { opacity: .8; }
+    .profile-banner {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--card-radius); padding: 18px 20px;
+      margin-bottom: 12px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    }
+    .p-avatar {
+      width: 56px; height: 56px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; flex-shrink: 0;
+    }
+    .p-name { font-size: 20px; font-weight: 700; }
+    .p-rank { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .p-stats { display: flex; gap: 20px; margin-left: auto; flex-wrap: wrap; }
+    .p-stat { text-align: center; }
+    .p-stat-val { font-size: 20px; font-weight: 700; }
+    .p-stat-lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    /* ── Medals ── */
+    .medals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .medal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: transform .15s, border-color .15s;
+    }
+    .medal-card:hover { transform: translateY(-2px); }
+    .medal-icon {
+      font-size: 30px;
+      flex-shrink: 0;
+      width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+      background: #1e1e1e;
+    }
+    .medal-body { min-width: 0; }
+    .medal-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+    .medal-winner { font-size: 16px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .medal-stat { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    /* ── Tooltip ── */
+    #tooltip {
+      position: fixed; background: #1e1e1e; border: 1px solid #3a3a3a;
+      border-radius: 6px; padding: 6px 10px; font-size: 12px;
+      pointer-events: none; z-index: 999; display: none; white-space: nowrap;
+    }
+    /* ── Responsive ── */
+    @media (max-width: 860px) {
+      .row.c2, .row.c3 { grid-template-columns: 1fr; }
+      .p-stats { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="tooltip"></div>
+
+<header class="header">
+  <div class="header-brand">
+    <div class="header-title">💩 Poo Tracker 2026</div>
+    <div class="header-sub">Triatlon Tetuan · Feb 16 – Apr 27, 2026</div>
+  </div>
+  <div class="main-tabs">
+    <button class="main-tab active" onclick="switchTab('group',this)">Group</button>
+    <button class="main-tab" onclick="switchTab('profiles',this)">Profiles</button>
+  </div>
+</header>
+
+<main class="content">
+
+  <!-- ── GROUP TAB ── -->
+  <div id="tab-group" class="tab-panel active">
+    <div class="kpi-grid" id="kpi-grid"></div>
+    <div class="medals-grid" id="medals-grid"></div>
+    <div class="row c3">
+      <div class="card">
+        <div class="card-title">🏆 Leaderboard</div>
+        <div id="lb"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📈 Cumulative Poos Over Time</div>
+        <div class="ch" style="height:290px"><canvas id="c-cumul"></canvas></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">📅 Activity Calendar — Group</div>
+      <div class="hm-scroll"><div id="hm-group"></div></div>
+    </div>
+    <div class="row c2">
+      <div class="card">
+        <div class="card-title">⏰ Happy Hour</div>
+        <div class="ch" style="height:190px"><canvas id="c-hh"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📆 Day of Week</div>
+        <div class="ch" style="height:190px"><canvas id="c-dow"></canvas></div>
+      </div>
+    </div>
+    <div class="row c2" style="margin-top:12px">
+      <div class="card">
+        <div class="card-title">🔥 Streaks (Longest / Current)</div>
+        <div class="ch" style="height:210px"><canvas id="c-streaks"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Daily Poos — Group Total</div>
+        <div class="ch" style="height:210px"><canvas id="c-daily"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PROFILES TAB ── -->
+  <div id="tab-profiles" class="tab-panel">
+    <div class="ptabs-row" id="ptabs-row"></div>
+    <div id="profile-content"></div>
+  </div>
+
+</main>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+const POO_DATA = [{"ts": "2026-01-17T10:23:08", "name": "Maldo"}, {"ts": "2026-01-17T10:29:27", "name": "Sendra"}, {"ts": "2026-01-17T11:16:50", "name": "Jesús"}, {"ts": "2026-01-17T14:24:48", "name": "Maldo"}, {"ts": "2026-01-17T16:07:57", "name": "Maldo"}, {"ts": "2026-01-17T17:48:07", "name": "Sergio"}, {"ts": "2026-01-17T17:56:49", "name": "Raúl"}, {"ts": "2026-01-17T21:34:46", "name": "Sendra"}, {"ts": "2026-01-17T23:16:26", "name": "Jesús"}, {"ts": "2026-01-17T23:57:58", "name": "Maldo"}, {"ts": "2026-01-17T23:58:22", "name": "Sendra"}, {"ts": "2026-01-18T00:16:44", "name": "Raúl"}, {"ts": "2026-01-18T10:32:46", "name": "Jesús"}, {"ts": "2026-01-18T10:33:10", "name": "Sergio"}, {"ts": "2026-01-18T10:33:18", "name": "Sendra"}, {"ts": "2026-01-18T10:46:28", "name": "Pablo"}, {"ts": "2026-01-18T13:22:51", "name": "Jesús"}, {"ts": "2026-01-18T16:02:25", "name": "Jesús"}, {"ts": "2026-01-18T16:22:42", "name": "Sendra"}, {"ts": "2026-01-18T16:25:30", "name": "Maldo"}, {"ts": "2026-01-18T21:33:50", "name": "Maldo"}, {"ts": "2026-01-19T01:10:08", "name": "Maldo"}, {"ts": "2026-01-19T07:53:35", "name": "Raúl"}, {"ts": "2026-01-19T07:57:06", "name": "Sendra"}, {"ts": "2026-01-19T08:36:03", "name": "Pablo"}, {"ts": "2026-01-19T10:01:35", "name": "Jesús"}, {"ts": "2026-01-19T10:41:47", "name": "Sergio"}, {"ts": "2026-01-19T11:26:45", "name": "Jesús"}, {"ts": "2026-01-19T15:15:37", "name": "Jesús"}, {"ts": "2026-01-19T15:27:56", "name": "Maldo"}, {"ts": "2026-01-19T15:29:48", "name": "Pablo"}, {"ts": "2026-01-19T17:55:07", "name": "Maldo"}, {"ts": "2026-01-19T18:00:47", "name": "Sergio"}, {"ts": "2026-01-19T18:38:30", "name": "Jesús"}, {"ts": "2026-01-19T19:33:08", "name": "Sergio"}, {"ts": "2026-01-19T20:42:04", "name": "Sergio"}, {"ts": "2026-01-19T20:42:42", "name": "Raúl"}, {"ts": "2026-01-19T22:12:10", "name": "Maldo"}, {"ts": "2026-01-19T22:50:15", "name": "Maldo"}, {"ts": "2026-01-20T07:20:10", "name": "Maldo"}, {"ts": "2026-01-20T07:32:57", "name": "Sendra"}, {"ts": "2026-01-20T10:46:53", "name": "Jesús"}, {"ts": "2026-01-20T15:07:28", "name": "Maldo"}, {"ts": "2026-01-20T15:08:04", "name": "Sergio"}, {"ts": "2026-01-20T15:26:46", "name": "Jesús"}, {"ts": "2026-01-20T15:45:53", "name": "Pablo"}, {"ts": "2026-01-20T17:45:19", "name": "Maldo"}, {"ts": "2026-01-21T00:27:07", "name": "Maldo"}, {"ts": "2026-01-21T07:35:55", "name": "Sendra"}, {"ts": "2026-01-21T07:51:14", "name": "Raúl"}, {"ts": "2026-01-21T09:46:54", "name": "Sergio"}, {"ts": "2026-01-21T10:02:01", "name": "Jesús"}, {"ts": "2026-01-21T14:54:16", "name": "Sendra"}, {"ts": "2026-01-21T15:12:52", "name": "Jesús"}, {"ts": "2026-01-21T19:04:08", "name": "Jesús"}, {"ts": "2026-01-21T19:13:46", "name": "Sergio"}, {"ts": "2026-01-21T19:21:17", "name": "Raúl"}, {"ts": "2026-01-21T22:04:53", "name": "Sergio"}, {"ts": "2026-01-22T00:45:12", "name": "Maldo"}, {"ts": "2026-01-22T09:08:40", "name": "Jesús"}, {"ts": "2026-01-22T15:30:13", "name": "Jesús"}, {"ts": "2026-01-22T17:01:52", "name": "Sergio"}, {"ts": "2026-01-22T17:26:21", "name": "Pablo"}, {"ts": "2026-01-22T18:29:24", "name": "Jesús"}, {"ts": "2026-01-22T19:49:40", "name": "Raúl"}, {"ts": "2026-01-22T22:27:33", "name": "Maldo"}, {"ts": "2026-01-23T00:06:44", "name": "Maldo"}, {"ts": "2026-01-23T07:20:33", "name": "Sendra"}, {"ts": "2026-01-23T07:54:26", "name": "Raúl"}, {"ts": "2026-01-23T08:51:28", "name": "Sergio"}, {"ts": "2026-01-23T10:10:39", "name": "Jesús"}, {"ts": "2026-01-23T10:39:20", "name": "Sendra"}, {"ts": "2026-01-23T11:42:43", "name": "Jesús"}, {"ts": "2026-01-23T12:57:50", "name": "Sergio"}, {"ts": "2026-01-23T15:36:36", "name": "Jesús"}, {"ts": "2026-01-23T15:48:17", "name": "Sendra"}, {"ts": "2026-01-23T15:59:34", "name": "Pablo"}, {"ts": "2026-01-23T18:03:35", "name": "Jesús"}, {"ts": "2026-01-23T18:03:54", "name": "Raúl"}, {"ts": "2026-01-23T20:07:04", "name": "Maldo"}, {"ts": "2026-01-23T22:22:05", "name": "Maldo"}, {"ts": "2026-01-24T01:03:35", "name": "Maldo"}, {"ts": "2026-01-24T08:17:43", "name": "Sendra"}, {"ts": "2026-01-24T09:28:56", "name": "Sergio"}, {"ts": "2026-01-24T09:43:11", "name": "Raúl"}, {"ts": "2026-01-24T10:15:35", "name": "Jesús"}, {"ts": "2026-01-24T10:33:07", "name": "Maldo"}, {"ts": "2026-01-24T10:57:51", "name": "Jesús"}, {"ts": "2026-01-24T12:31:48", "name": "Pablo"}, {"ts": "2026-01-24T13:41:17", "name": "Maldo"}, {"ts": "2026-01-24T15:44:27", "name": "Sendra"}, {"ts": "2026-01-24T19:41:34", "name": "Jesús"}, {"ts": "2026-01-25T00:13:46", "name": "Maldo"}, {"ts": "2026-01-25T01:03:53", "name": "Maldo"}, {"ts": "2026-01-25T03:17:18", "name": "Maldo"}, {"ts": "2026-01-25T07:42:28", "name": "Sergio"}, {"ts": "2026-01-25T07:44:54", "name": "Sendra"}, {"ts": "2026-01-25T08:23:09", "name": "Sergio"}, {"ts": "2026-01-25T08:24:15", "name": "Raúl"}, {"ts": "2026-01-25T08:30:20", "name": "Raúl"}, {"ts": "2026-01-25T08:36:27", "name": "Raúl"}, {"ts": "2026-01-25T08:42:24", "name": "Raúl"}, {"ts": "2026-01-25T09:06:17", "name": "Jesús"}, {"ts": "2026-01-25T11:08:15", "name": "Jesús"}, {"ts": "2026-01-25T13:32:38", "name": "Sendra"}, {"ts": "2026-01-25T13:35:33", "name": "Sergio"}, {"ts": "2026-01-25T15:43:18", "name": "Jesús"}, {"ts": "2026-01-25T16:02:22", "name": "Maldo"}, {"ts": "2026-01-25T16:17:57", "name": "Pablo"}, {"ts": "2026-01-25T22:30:45", "name": "Raúl"}, {"ts": "2026-01-25T22:50:02", "name": "Maldo"}, {"ts": "2026-01-26T00:37:00", "name": "Maldo"}, {"ts": "2026-01-26T01:10:09", "name": "Maldo"}, {"ts": "2026-01-26T07:51:33", "name": "Raúl"}, {"ts": "2026-01-26T09:45:31", "name": "Jesús"}, {"ts": "2026-01-26T11:41:15", "name": "Sergio"}, {"ts": "2026-01-26T11:46:01", "name": "Jesús"}, {"ts": "2026-01-26T12:28:36", "name": "Pablo"}, {"ts": "2026-01-26T15:15:40", "name": "Maldo"}, {"ts": "2026-01-26T15:44:43", "name": "Jesús"}, {"ts": "2026-01-26T15:46:02", "name": "Pablo"}, {"ts": "2026-01-26T22:11:07", "name": "Sergio"}, {"ts": "2026-01-27T00:27:18", "name": "Maldo"}, {"ts": "2026-01-27T01:20:30", "name": "Maldo"}, {"ts": "2026-01-27T08:59:02", "name": "Sendra"}, {"ts": "2026-01-27T09:46:22", "name": "Jesús"}, {"ts": "2026-01-27T10:58:20", "name": "Jesús"}, {"ts": "2026-01-27T13:07:24", "name": "Pablo"}, {"ts": "2026-01-27T15:55:40", "name": "Jesús"}, {"ts": "2026-01-27T16:47:16", "name": "Pablo"}, {"ts": "2026-01-27T20:13:19", "name": "Maldo"}, {"ts": "2026-01-28T07:47:02", "name": "Sendra"}, {"ts": "2026-01-28T07:47:29", "name": "Raúl"}, {"ts": "2026-01-28T09:29:11", "name": "Jesús"}, {"ts": "2026-01-28T13:18:48", "name": "Pablo"}, {"ts": "2026-01-28T15:32:14", "name": "Maldo"}, {"ts": "2026-01-28T16:16:46", "name": "Pablo"}, {"ts": "2026-01-28T16:48:13", "name": "Maldo"}, {"ts": "2026-01-28T17:00:53", "name": "Jesús"}, {"ts": "2026-01-28T17:03:31", "name": "Sergio"}, {"ts": "2026-01-28T18:14:59", "name": "Pablo"}, {"ts": "2026-01-28T19:34:30", "name": "Maldo"}, {"ts": "2026-01-28T20:14:56", "name": "Pablo"}, {"ts": "2026-01-28T21:25:52", "name": "Sergio"}, {"ts": "2026-01-29T10:07:52", "name": "Jesús"}, {"ts": "2026-01-29T10:14:59", "name": "Raúl"}, {"ts": "2026-01-29T10:24:24", "name": "Sendra"}, {"ts": "2026-01-29T10:37:36", "name": "Sergio"}, {"ts": "2026-01-29T15:48:08", "name": "Jesús"}, {"ts": "2026-01-29T16:01:11", "name": "Sendra"}, {"ts": "2026-01-29T17:44:56", "name": "Maldo"}, {"ts": "2026-01-29T17:50:20", "name": "Pablo"}, {"ts": "2026-01-30T00:31:05", "name": "Sergio"}, {"ts": "2026-01-30T00:51:55", "name": "Raúl"}, {"ts": "2026-01-30T08:00:35", "name": "Maldo"}, {"ts": "2026-01-30T08:00:59", "name": "Raúl"}, {"ts": "2026-01-30T09:14:00", "name": "Sendra"}, {"ts": "2026-01-30T09:14:24", "name": "Jesús"}, {"ts": "2026-01-30T10:12:55", "name": "Jesús"}, {"ts": "2026-01-30T10:24:42", "name": "Pablo"}, {"ts": "2026-01-30T12:43:18", "name": "Sergio"}, {"ts": "2026-01-30T13:58:48", "name": "Jesús"}, {"ts": "2026-01-30T14:22:31", "name": "Maldo"}, {"ts": "2026-01-30T15:49:37", "name": "Jesús"}, {"ts": "2026-01-30T16:10:19", "name": "Raúl"}, {"ts": "2026-01-30T16:21:51", "name": "Maldo"}, {"ts": "2026-01-30T16:31:56", "name": "Sergio"}, {"ts": "2026-01-30T23:39:57", "name": "Maldo"}, {"ts": "2026-01-31T05:20:59", "name": "Raúl"}, {"ts": "2026-01-31T06:42:23", "name": "Maldo"}, {"ts": "2026-01-31T08:46:23", "name": "Pablo"}, {"ts": "2026-01-31T08:50:36", "name": "Sendra"}, {"ts": "2026-01-31T11:59:50", "name": "Jesús"}, {"ts": "2026-01-31T12:36:01", "name": "Pablo"}, {"ts": "2026-01-31T12:40:54", "name": "Sergio"}, {"ts": "2026-01-31T12:41:38", "name": "Raúl"}, {"ts": "2026-01-31T14:14:32", "name": "Jesús"}, {"ts": "2026-01-31T15:26:39", "name": "Jesús"}, {"ts": "2026-01-31T17:48:53", "name": "Jesús"}, {"ts": "2026-01-31T18:05:11", "name": "Sergio"}, {"ts": "2026-01-31T18:28:43", "name": "Raúl"}, {"ts": "2026-02-01T08:03:01", "name": "Sergio"}, {"ts": "2026-02-01T10:14:45", "name": "Sergio"}, {"ts": "2026-02-01T11:20:29", "name": "Sendra"}, {"ts": "2026-02-01T12:44:23", "name": "Raúl"}, {"ts": "2026-02-01T13:24:04", "name": "Maldo"}, {"ts": "2026-02-01T13:25:43", "name": "Jesús"}, {"ts": "2026-02-01T13:30:32", "name": "Pablo"}, {"ts": "2026-02-01T14:59:25", "name": "Pablo"}, {"ts": "2026-02-01T15:44:31", "name": "Sendra"}, {"ts": "2026-02-01T16:19:49", "name": "Jesús"}, {"ts": "2026-02-01T16:26:59", "name": "Pablo"}, {"ts": "2026-02-01T17:46:40", "name": "Sendra"}, {"ts": "2026-02-01T22:46:28", "name": "Maldo"}, {"ts": "2026-02-02T10:25:53", "name": "Jesús"}, {"ts": "2026-02-02T12:13:02", "name": "Pablo"}, {"ts": "2026-02-02T14:57:55", "name": "Sergio"}, {"ts": "2026-02-02T16:46:11", "name": "Maldo"}, {"ts": "2026-02-02T17:12:39", "name": "Sergio"}, {"ts": "2026-02-02T17:39:00", "name": "Jesús"}, {"ts": "2026-02-02T17:53:14", "name": "Pablo"}, {"ts": "2026-02-02T17:56:17", "name": "Maldo"}, {"ts": "2026-02-02T18:43:19", "name": "Jesús"}, {"ts": "2026-02-02T20:16:47", "name": "Sergio"}, {"ts": "2026-02-02T23:59:54", "name": "Jesús"}, {"ts": "2026-02-03T07:34:16", "name": "Sendra"}, {"ts": "2026-02-03T08:53:59", "name": "Jesús"}, {"ts": "2026-02-03T10:07:48", "name": "Jesús"}, {"ts": "2026-02-03T10:17:27", "name": "Sergio"}, {"ts": "2026-02-03T12:12:14", "name": "Pablo"}, {"ts": "2026-02-03T14:13:39", "name": "Maldo"}, {"ts": "2026-02-03T15:52:29", "name": "Jesús"}, {"ts": "2026-02-03T16:01:13", "name": "Raúl"}, {"ts": "2026-02-03T16:29:35", "name": "Pablo"}, {"ts": "2026-02-03T20:20:33", "name": "Maldo"}, {"ts": "2026-02-03T23:35:03", "name": "Maldo"}, {"ts": "2026-02-04T10:15:59", "name": "Jesús"}, {"ts": "2026-02-04T10:30:21", "name": "Pablo"}, {"ts": "2026-02-04T11:21:17", "name": "Pablo"}, {"ts": "2026-02-04T14:15:17", "name": "Pablo"}, {"ts": "2026-02-04T15:37:39", "name": "Jesús"}, {"ts": "2026-02-04T17:56:03", "name": "Jesús"}, {"ts": "2026-02-04T17:56:42", "name": "Sergio"}, {"ts": "2026-02-04T18:29:33", "name": "Pablo"}, {"ts": "2026-02-04T18:54:56", "name": "Sergio"}, {"ts": "2026-02-04T19:44:13", "name": "Maldo"}, {"ts": "2026-02-04T23:12:28", "name": "Maldo"}, {"ts": "2026-02-05T07:27:08", "name": "Sendra"}, {"ts": "2026-02-05T10:01:25", "name": "Jesús"}, {"ts": "2026-02-05T10:20:18", "name": "Pablo"}, {"ts": "2026-02-05T14:18:04", "name": "Maldo"}, {"ts": "2026-02-05T15:22:30", "name": "Jesús"}, {"ts": "2026-02-05T16:46:28", "name": "Maldo"}, {"ts": "2026-02-05T17:00:29", "name": "Pablo"}, {"ts": "2026-02-05T17:01:06", "name": "Sergio"}, {"ts": "2026-02-05T18:45:02", "name": "Jesús"}, {"ts": "2026-02-05T21:56:48", "name": "Maldo"}, {"ts": "2026-02-05T23:29:51", "name": "Sergio"}, {"ts": "2026-02-06T00:23:58", "name": "Maldo"}, {"ts": "2026-02-06T09:47:13", "name": "Sergio"}, {"ts": "2026-02-06T10:26:01", "name": "Jesús"}, {"ts": "2026-02-06T11:32:48", "name": "Pablo"}, {"ts": "2026-02-06T11:41:34", "name": "Jesús"}, {"ts": "2026-02-06T14:34:17", "name": "Maldo"}, {"ts": "2026-02-06T14:41:24", "name": "Pablo"}, {"ts": "2026-02-06T15:12:38", "name": "Sergio"}, {"ts": "2026-02-06T15:20:11", "name": "Jesús"}, {"ts": "2026-02-06T15:27:58", "name": "Sendra"}, {"ts": "2026-02-06T16:27:42", "name": "Maldo"}, {"ts": "2026-02-07T01:30:53", "name": "Maldo"}, {"ts": "2026-02-07T10:07:22", "name": "Sendra"}, {"ts": "2026-02-07T10:09:39", "name": "Jesús"}, {"ts": "2026-02-07T10:57:04", "name": "Maldo"}, {"ts": "2026-02-07T11:00:29", "name": "Jesús"}, {"ts": "2026-02-07T12:18:12", "name": "Jesús"}, {"ts": "2026-02-07T12:31:27", "name": "Maldo"}, {"ts": "2026-02-07T13:02:07", "name": "Sergio"}, {"ts": "2026-02-07T19:55:37", "name": "Jesús"}, {"ts": "2026-02-07T19:56:52", "name": "Pablo"}, {"ts": "2026-02-08T00:05:00", "name": "Maldo"}, {"ts": "2026-02-08T01:43:01", "name": "Maldo"}, {"ts": "2026-02-08T08:17:29", "name": "Sendra"}, {"ts": "2026-02-08T08:56:46", "name": "Jesús"}, {"ts": "2026-02-08T11:24:25", "name": "Sergio"}, {"ts": "2026-02-08T14:18:24", "name": "Jesús"}, {"ts": "2026-02-08T15:07:53", "name": "Sendra"}, {"ts": "2026-02-08T16:17:18", "name": "Pablo"}, {"ts": "2026-02-08T18:56:02", "name": "Jesús"}, {"ts": "2026-02-08T19:18:37", "name": "Pablo"}, {"ts": "2026-02-08T21:17:32", "name": "Maldo"}, {"ts": "2026-02-08T21:18:51", "name": "Jesús"}, {"ts": "2026-02-08T21:21:09", "name": "Sendra"}, {"ts": "2026-02-08T21:21:19", "name": "Jesús"}, {"ts": "2026-02-08T23:08:55", "name": "Maldo"}, {"ts": "2026-02-09T00:33:59", "name": "Maldo"}, {"ts": "2026-02-09T07:29:38", "name": "Sendra"}, {"ts": "2026-02-09T08:43:32", "name": "Sergio"}, {"ts": "2026-02-09T08:44:47", "name": "Jesús"}, {"ts": "2026-02-09T09:52:49", "name": "Pablo"}, {"ts": "2026-02-09T11:07:26", "name": "Pablo"}, {"ts": "2026-02-09T15:12:57", "name": "Jesús"}, {"ts": "2026-02-09T15:17:24", "name": "Pablo"}, {"ts": "2026-02-09T17:57:04", "name": "Maldo"}, {"ts": "2026-02-09T23:50:36", "name": "Maldo"}, {"ts": "2026-02-10T08:19:48", "name": "Sergio"}, {"ts": "2026-02-10T09:08:01", "name": "Jesús"}, {"ts": "2026-02-10T11:28:06", "name": "Sendra"}, {"ts": "2026-02-10T13:08:56", "name": "Pablo"}, {"ts": "2026-02-10T13:34:23", "name": "Sendra"}, {"ts": "2026-02-10T15:16:31", "name": "Jesús"}, {"ts": "2026-02-10T16:59:43", "name": "Sendra"}, {"ts": "2026-02-10T17:25:01", "name": "Jesús"}, {"ts": "2026-02-10T20:09:05", "name": "Maldo"}, {"ts": "2026-02-10T22:23:13", "name": "Maldo"}, {"ts": "2026-02-10T23:17:35", "name": "Maldo"}, {"ts": "2026-02-11T07:51:30", "name": "Jesús"}, {"ts": "2026-02-11T10:19:39", "name": "Sergio"}, {"ts": "2026-02-11T11:35:38", "name": "Pablo"}, {"ts": "2026-02-11T13:54:36", "name": "Sendra"}, {"ts": "2026-02-11T16:45:59", "name": "Maldo"}, {"ts": "2026-02-11T16:46:30", "name": "Sendra"}, {"ts": "2026-02-11T17:28:55", "name": "Jesús"}, {"ts": "2026-02-11T19:19:24", "name": "Jesús"}, {"ts": "2026-02-11T19:29:28", "name": "Sendra"}, {"ts": "2026-02-11T21:29:37", "name": "Sergio"}, {"ts": "2026-02-11T22:51:40", "name": "Jesús"}, {"ts": "2026-02-11T23:57:30", "name": "Jesús"}, {"ts": "2026-02-12T01:12:31", "name": "Maldo"}, {"ts": "2026-02-12T07:23:00", "name": "Sendra"}, {"ts": "2026-02-12T09:19:10", "name": "Sergio"}, {"ts": "2026-02-12T10:10:37", "name": "Jesús"}, {"ts": "2026-02-12T12:02:41", "name": "Jesús"}, {"ts": "2026-02-12T16:49:01", "name": "Pablo"}, {"ts": "2026-02-12T17:17:02", "name": "Sendra"}, {"ts": "2026-02-12T17:35:47", "name": "Jesús"}, {"ts": "2026-02-12T19:10:40", "name": "Maldo"}, {"ts": "2026-02-12T19:44:23", "name": "Jesús"}, {"ts": "2026-02-12T23:38:00", "name": "Jesús"}, {"ts": "2026-02-13T07:35:03", "name": "Maldo"}, {"ts": "2026-02-13T09:38:56", "name": "Jesús"}, {"ts": "2026-02-13T11:09:08", "name": "Jesús"}, {"ts": "2026-02-13T11:09:42", "name": "Sergio"}, {"ts": "2026-02-13T12:18:09", "name": "Jesús"}, {"ts": "2026-02-13T13:58:41", "name": "Pablo"}, {"ts": "2026-02-13T16:55:49", "name": "Maldo"}, {"ts": "2026-02-13T18:33:43", "name": "Jesús"}, {"ts": "2026-02-13T20:09:34", "name": "Jesús"}, {"ts": "2026-02-14T02:35:09", "name": "Maldo"}, {"ts": "2026-02-14T08:37:33", "name": "Sendra"}, {"ts": "2026-02-14T09:16:06", "name": "Maldo"}, {"ts": "2026-02-14T09:31:08", "name": "Jesús"}, {"ts": "2026-02-14T10:34:50", "name": "Pablo"}, {"ts": "2026-02-14T11:05:01", "name": "Pablo"}, {"ts": "2026-02-14T11:05:56", "name": "Sergio"}, {"ts": "2026-02-14T11:10:06", "name": "Jesús"}, {"ts": "2026-02-14T12:29:33", "name": "Sendra"}, {"ts": "2026-02-14T13:46:21", "name": "Maldo"}, {"ts": "2026-02-14T16:27:04", "name": "Jesús"}, {"ts": "2026-02-14T16:27:32", "name": "Sergio"}, {"ts": "2026-02-14T19:44:42", "name": "Sergio"}, {"ts": "2026-02-15T09:03:35", "name": "Maldo"}, {"ts": "2026-02-15T09:30:39", "name": "Jesús"}, {"ts": "2026-02-15T09:34:29", "name": "Sergio"}, {"ts": "2026-02-15T09:39:21", "name": "Sendra"}, {"ts": "2026-02-15T11:02:03", "name": "Jesús"}, {"ts": "2026-02-15T12:01:50", "name": "Pablo"}, {"ts": "2026-02-15T16:29:47", "name": "Jesús"}, {"ts": "2026-02-15T16:29:57", "name": "Pablo"}, {"ts": "2026-02-15T16:46:48", "name": "Maldo"}, {"ts": "2026-02-15T18:40:00", "name": "Pablo"}, {"ts": "2026-02-15T21:55:18", "name": "Maldo"}, {"ts": "2026-02-15T23:38:21", "name": "Maldo"}, {"ts": "2026-02-16T00:49:54", "name": "Maldo"}, {"ts": "2026-02-16T08:22:09", "name": "Jesús"}, {"ts": "2026-02-16T09:23:57", "name": "Sergio"}, {"ts": "2026-02-16T10:09:11", "name": "Jesús"}, {"ts": "2026-02-16T13:22:23", "name": "Sendra"}, {"ts": "2026-02-16T16:06:48", "name": "Jesús"}, {"ts": "2026-02-16T16:22:47", "name": "Pablo"}, {"ts": "2026-02-16T18:54:39", "name": "Maldo"}, {"ts": "2026-02-16T19:50:23", "name": "Maldo"}, {"ts": "2026-02-16T19:59:43", "name": "Sergio"}, {"ts": "2026-02-16T23:27:43", "name": "Maldo"}, {"ts": "2026-02-17T08:02:56", "name": "Maldo"}, {"ts": "2026-02-17T08:58:54", "name": "Sergio"}, {"ts": "2026-02-17T09:42:08", "name": "Jesús"}, {"ts": "2026-02-17T11:29:35", "name": "Jesús"}, {"ts": "2026-02-17T11:48:33", "name": "Sendra"}, {"ts": "2026-02-17T12:25:55", "name": "Jesús"}, {"ts": "2026-02-17T12:55:45", "name": "Pablo"}, {"ts": "2026-02-17T15:23:03", "name": "Maldo"}, {"ts": "2026-02-17T16:33:18", "name": "Jesús"}, {"ts": "2026-02-17T16:41:46", "name": "Sendra"}, {"ts": "2026-02-17T17:26:53", "name": "Pablo"}, {"ts": "2026-02-17T21:38:56", "name": "Maldo"}, {"ts": "2026-02-18T06:22:32", "name": "Sergio"}, {"ts": "2026-02-18T07:26:44", "name": "Sendra"}, {"ts": "2026-02-18T08:49:18", "name": "Jesús"}, {"ts": "2026-02-18T09:13:58", "name": "Sergio"}, {"ts": "2026-02-18T10:54:47", "name": "Jesús"}, {"ts": "2026-02-18T12:20:56", "name": "Sergio"}, {"ts": "2026-02-18T12:56:59", "name": "Sendra"}, {"ts": "2026-02-18T13:27:46", "name": "Sergio"}, {"ts": "2026-02-18T13:55:11", "name": "Sendra"}, {"ts": "2026-02-18T15:24:09", "name": "Pablo"}, {"ts": "2026-02-18T18:33:12", "name": "Maldo"}, {"ts": "2026-02-18T23:53:27", "name": "Maldo"}, {"ts": "2026-02-19T09:10:00", "name": "Sendra"}, {"ts": "2026-02-19T10:34:39", "name": "Jesús"}, {"ts": "2026-02-19T15:42:42", "name": "Sergio"}, {"ts": "2026-02-19T16:23:56", "name": "Pablo"}, {"ts": "2026-02-19T19:15:18", "name": "Jesús"}, {"ts": "2026-02-19T22:19:24", "name": "Maldo"}, {"ts": "2026-02-20T06:52:51", "name": "Maldo"}, {"ts": "2026-02-20T08:12:19", "name": "Pablo"}, {"ts": "2026-02-20T09:44:38", "name": "Jesús"}, {"ts": "2026-02-20T09:54:43", "name": "Sergio"}, {"ts": "2026-02-20T11:49:14", "name": "Jesús"}, {"ts": "2026-02-20T12:45:34", "name": "Sergio"}, {"ts": "2026-02-20T14:23:36", "name": "Pablo"}, {"ts": "2026-02-20T14:40:39", "name": "Sendra"}, {"ts": "2026-02-20T15:41:01", "name": "Maldo"}, {"ts": "2026-02-20T15:41:22", "name": "Jesús"}, {"ts": "2026-02-20T16:15:46", "name": "Sergio"}, {"ts": "2026-02-20T16:47:22", "name": "Maldo"}, {"ts": "2026-02-20T20:14:01", "name": "Sergio"}, {"ts": "2026-02-20T20:27:56", "name": "Sergio"}, {"ts": "2026-02-20T20:30:01", "name": "Pablo"}, {"ts": "2026-02-21T08:59:36", "name": "Sergio"}, {"ts": "2026-02-21T09:19:07", "name": "Pablo"}, {"ts": "2026-02-21T09:20:20", "name": "Jesús"}, {"ts": "2026-02-21T09:23:44", "name": "Maldo"}, {"ts": "2026-02-21T12:58:10", "name": "Sergio"}, {"ts": "2026-02-21T13:39:16", "name": "Maldo"}, {"ts": "2026-02-21T16:29:18", "name": "Sergio"}, {"ts": "2026-02-21T18:31:53", "name": "Jesús"}, {"ts": "2026-02-21T18:43:35", "name": "Sergio"}, {"ts": "2026-02-21T20:53:47", "name": "Maldo"}, {"ts": "2026-02-22T00:12:08", "name": "Maldo"}, {"ts": "2026-02-22T08:41:54", "name": "Sergio"}, {"ts": "2026-02-22T08:42:04", "name": "Maldo"}, {"ts": "2026-02-22T09:25:55", "name": "Maldo"}, {"ts": "2026-02-22T09:30:21", "name": "Sendra"}, {"ts": "2026-02-22T09:30:41", "name": "Jesús"}, {"ts": "2026-02-22T09:32:07", "name": "Sergio"}, {"ts": "2026-02-22T09:35:43", "name": "Raúl"}, {"ts": "2026-02-22T10:00:22", "name": "Sergio"}, {"ts": "2026-02-22T10:08:23", "name": "Sergio"}, {"ts": "2026-02-22T10:42:55", "name": "Pablo"}, {"ts": "2026-02-22T12:40:18", "name": "Maldo"}, {"ts": "2026-02-22T13:18:20", "name": "Sergio"}, {"ts": "2026-02-22T14:57:25", "name": "Maldo"}, {"ts": "2026-02-22T15:20:57", "name": "Raúl"}, {"ts": "2026-02-22T18:49:03", "name": "Sendra"}, {"ts": "2026-02-22T18:55:30", "name": "Jesús"}, {"ts": "2026-02-22T19:31:54", "name": "Sergio"}, {"ts": "2026-02-22T21:30:11", "name": "Maldo"}, {"ts": "2026-02-23T01:08:36", "name": "Raúl"}, {"ts": "2026-02-23T07:41:36", "name": "Sendra"}, {"ts": "2026-02-23T08:05:49", "name": "Raúl"}, {"ts": "2026-02-23T08:29:46", "name": "Jesús"}, {"ts": "2026-02-23T08:54:37", "name": "Sergio"}, {"ts": "2026-02-23T10:00:32", "name": "Pablo"}, {"ts": "2026-02-23T15:04:38", "name": "Maldo"}, {"ts": "2026-02-23T15:39:26", "name": "Maldo"}, {"ts": "2026-02-23T15:41:35", "name": "Jesús"}, {"ts": "2026-02-23T15:54:58", "name": "Pablo"}, {"ts": "2026-02-23T16:02:45", "name": "Sergio"}, {"ts": "2026-02-23T16:10:31", "name": "Raúl"}, {"ts": "2026-02-23T17:07:13", "name": "Sendra"}, {"ts": "2026-02-23T17:15:54", "name": "Maldo"}, {"ts": "2026-02-23T19:08:23", "name": "Raúl"}, {"ts": "2026-02-23T19:51:13", "name": "Maldo"}, {"ts": "2026-02-23T20:56:58", "name": "Raúl"}, {"ts": "2026-02-24T05:48:03", "name": "Sergio"}, {"ts": "2026-02-24T07:52:45", "name": "Raúl"}, {"ts": "2026-02-24T09:07:27", "name": "Sergio"}, {"ts": "2026-02-24T09:15:02", "name": "Jesús"}, {"ts": "2026-02-24T10:01:06", "name": "Jesús"}, {"ts": "2026-02-24T14:39:04", "name": "Pablo"}, {"ts": "2026-02-24T15:37:31", "name": "Jesús"}, {"ts": "2026-02-24T16:05:46", "name": "Raúl"}, {"ts": "2026-02-24T20:20:56", "name": "Raúl"}, {"ts": "2026-02-24T22:09:43", "name": "Maldo"}, {"ts": "2026-02-25T07:17:39", "name": "Maldo"}, {"ts": "2026-02-25T08:02:46", "name": "Raúl"}, {"ts": "2026-02-25T08:09:58", "name": "Sendra"}, {"ts": "2026-02-25T08:37:33", "name": "Jesús"}, {"ts": "2026-02-25T09:36:23", "name": "Jesús"}, {"ts": "2026-02-25T10:00:48", "name": "Sergio"}, {"ts": "2026-02-25T11:31:06", "name": "Pablo"}, {"ts": "2026-02-25T14:42:11", "name": "Sendra"}, {"ts": "2026-02-25T15:31:47", "name": "Sendra"}, {"ts": "2026-02-25T15:39:26", "name": "Jesús"}, {"ts": "2026-02-25T16:09:21", "name": "Raúl"}, {"ts": "2026-02-25T16:20:11", "name": "Maldo"}, {"ts": "2026-02-25T18:16:57", "name": "Pablo"}, {"ts": "2026-02-25T19:27:30", "name": "Raúl"}, {"ts": "2026-02-26T01:57:56", "name": "Maldo"}, {"ts": "2026-02-26T08:02:39", "name": "Raúl"}, {"ts": "2026-02-26T10:30:25", "name": "Jesús"}, {"ts": "2026-02-26T13:34:31", "name": "Pablo"}, {"ts": "2026-02-26T13:34:48", "name": "Sendra"}, {"ts": "2026-02-26T15:04:16", "name": "Jesús"}, {"ts": "2026-02-26T16:07:31", "name": "Raúl"}, {"ts": "2026-02-26T17:34:54", "name": "Pablo"}, {"ts": "2026-02-26T19:01:36", "name": "Maldo"}, {"ts": "2026-02-26T19:02:25", "name": "Sergio"}, {"ts": "2026-02-26T20:19:07", "name": "Raúl"}, {"ts": "2026-02-26T23:16:55", "name": "Pablo"}, {"ts": "2026-02-27T07:28:11", "name": "Maldo"}, {"ts": "2026-02-27T07:28:42", "name": "Jesús"}, {"ts": "2026-02-27T07:54:18", "name": "Sendra"}, {"ts": "2026-02-27T07:56:10", "name": "Raúl"}, {"ts": "2026-02-27T12:20:32", "name": "Pablo"}, {"ts": "2026-02-27T13:33:55", "name": "Sendra"}, {"ts": "2026-02-27T16:14:42", "name": "Raúl"}, {"ts": "2026-02-27T17:14:37", "name": "Jesús"}, {"ts": "2026-02-27T19:40:15", "name": "Jesús"}, {"ts": "2026-02-27T20:34:29", "name": "Jesús"}, {"ts": "2026-02-27T20:42:20", "name": "Pablo"}, {"ts": "2026-02-27T21:17:25", "name": "Maldo"}, {"ts": "2026-02-27T23:46:37", "name": "Raúl"}, {"ts": "2026-02-28T07:30:22", "name": "Sendra"}, {"ts": "2026-02-28T08:27:09", "name": "Maldo"}, {"ts": "2026-02-28T09:13:19", "name": "Pablo"}, {"ts": "2026-02-28T09:16:39", "name": "Raúl"}, {"ts": "2026-02-28T09:48:57", "name": "Maldo"}, {"ts": "2026-02-28T09:53:57", "name": "Jesús"}, {"ts": "2026-02-28T10:11:11", "name": "Sergio"}, {"ts": "2026-02-28T10:36:04", "name": "Sendra"}, {"ts": "2026-02-28T10:44:42", "name": "Maldo"}, {"ts": "2026-02-28T10:59:51", "name": "Sergio"}, {"ts": "2026-02-28T14:44:15", "name": "Pablo"}, {"ts": "2026-02-28T18:32:30", "name": "Sendra"}, {"ts": "2026-02-28T19:28:53", "name": "Sergio"}, {"ts": "2026-02-28T20:09:34", "name": "Raúl"}, {"ts": "2026-03-01T00:58:07", "name": "Raúl"}, {"ts": "2026-03-01T07:58:06", "name": "Jesús"}, {"ts": "2026-03-01T08:50:37", "name": "Maldo"}, {"ts": "2026-03-01T09:00:36", "name": "Sergio"}, {"ts": "2026-03-01T09:07:11", "name": "Raúl"}, {"ts": "2026-03-01T09:35:19", "name": "Sergio"}, {"ts": "2026-03-01T09:56:25", "name": "Jesús"}, {"ts": "2026-03-01T10:01:06", "name": "Pablo"}, {"ts": "2026-03-01T10:15:44", "name": "Pablo"}, {"ts": "2026-03-01T11:02:58", "name": "Sendra"}, {"ts": "2026-03-01T11:20:08", "name": "Maldo"}, {"ts": "2026-03-01T11:29:58", "name": "Jesús"}, {"ts": "2026-03-01T12:29:30", "name": "Sergio"}, {"ts": "2026-03-01T13:08:23", "name": "Sendra"}, {"ts": "2026-03-01T19:13:06", "name": "Pablo"}, {"ts": "2026-03-01T19:13:21", "name": "Raúl"}, {"ts": "2026-03-01T20:41:25", "name": "Jesús"}, {"ts": "2026-03-01T23:36:58", "name": "Jesús"}, {"ts": "2026-03-01T23:57:58", "name": "Maldo"}, {"ts": "2026-03-02T00:53:42", "name": "Maldo"}, {"ts": "2026-03-02T08:04:17", "name": "Raúl"}, {"ts": "2026-03-02T08:25:43", "name": "Sergio"}, {"ts": "2026-03-02T09:21:39", "name": "Jesús"}, {"ts": "2026-03-02T09:59:28", "name": "Jesús"}, {"ts": "2026-03-02T12:03:55", "name": "Jesús"}, {"ts": "2026-03-02T12:14:09", "name": "Sendra"}, {"ts": "2026-03-02T13:08:23", "name": "Pablo"}, {"ts": "2026-03-02T13:16:23", "name": "Sendra"}, {"ts": "2026-03-02T16:00:04", "name": "Sergio"}, {"ts": "2026-03-02T16:06:22", "name": "Raúl"}, {"ts": "2026-03-02T18:53:32", "name": "Maldo"}, {"ts": "2026-03-02T19:51:35", "name": "Maldo"}, {"ts": "2026-03-02T20:21:09", "name": "Sergio"}, {"ts": "2026-03-02T22:04:03", "name": "Jesús"}, {"ts": "2026-03-03T07:49:49", "name": "Raúl"}, {"ts": "2026-03-03T08:00:04", "name": "Pablo"}, {"ts": "2026-03-03T08:41:26", "name": "Maldo"}, {"ts": "2026-03-03T08:50:41", "name": "Jesús"}, {"ts": "2026-03-03T10:19:40", "name": "Jesús"}, {"ts": "2026-03-03T13:26:43", "name": "Sendra"}, {"ts": "2026-03-03T15:31:44", "name": "Jesús"}, {"ts": "2026-03-03T15:58:46", "name": "Jesús"}, {"ts": "2026-03-03T16:03:24", "name": "Raúl"}, {"ts": "2026-03-03T16:19:16", "name": "Maldo"}, {"ts": "2026-03-03T16:21:37", "name": "Pablo"}, {"ts": "2026-03-03T20:16:19", "name": "Raúl"}, {"ts": "2026-03-03T20:26:34", "name": "Maldo"}, {"ts": "2026-03-03T23:15:29", "name": "Maldo"}, {"ts": "2026-03-04T07:46:47", "name": "Sendra"}, {"ts": "2026-03-04T08:01:01", "name": "Raúl"}, {"ts": "2026-03-04T09:45:13", "name": "Sergio"}, {"ts": "2026-03-04T10:19:37", "name": "Jesús"}, {"ts": "2026-03-04T10:56:24", "name": "Jesús"}, {"ts": "2026-03-04T11:05:23", "name": "Sergio"}, {"ts": "2026-03-04T12:08:21", "name": "Jesús"}, {"ts": "2026-03-04T15:20:15", "name": "Jesús"}, {"ts": "2026-03-04T16:12:48", "name": "Raúl"}, {"ts": "2026-03-04T16:26:54", "name": "Sendra"}, {"ts": "2026-03-04T16:34:50", "name": "Pablo"}, {"ts": "2026-03-04T16:41:17", "name": "Sergio"}, {"ts": "2026-03-04T19:26:47", "name": "Raúl"}, {"ts": "2026-03-04T19:38:45", "name": "Maldo"}, {"ts": "2026-03-04T22:30:21", "name": "Maldo"}, {"ts": "2026-03-04T22:36:44", "name": "Raúl"}, {"ts": "2026-03-05T00:50:48", "name": "Maldo"}, {"ts": "2026-03-05T08:00:35", "name": "Raúl"}, {"ts": "2026-03-05T08:10:07", "name": "Sendra"}, {"ts": "2026-03-05T09:13:52", "name": "Sergio"}, {"ts": "2026-03-05T09:29:17", "name": "Jesús"}, {"ts": "2026-03-05T10:12:31", "name": "Jesús"}, {"ts": "2026-03-05T14:50:26", "name": "Jesús"}, {"ts": "2026-03-05T15:57:17", "name": "Pablo"}, {"ts": "2026-03-05T18:32:18", "name": "Pablo"}, {"ts": "2026-03-05T18:38:13", "name": "Raúl"}, {"ts": "2026-03-05T18:46:17", "name": "Maldo"}, {"ts": "2026-03-05T20:30:20", "name": "Raúl"}, {"ts": "2026-03-06T07:29:37", "name": "Sendra"}, {"ts": "2026-03-06T07:50:14", "name": "Jesús"}, {"ts": "2026-03-06T09:02:52", "name": "Raúl"}, {"ts": "2026-03-06T09:44:37", "name": "Sergio"}, {"ts": "2026-03-06T10:28:00", "name": "Jesús"}, {"ts": "2026-03-06T11:33:48", "name": "Jesús"}, {"ts": "2026-03-06T12:28:42", "name": "Pablo"}, {"ts": "2026-03-06T14:14:46", "name": "Pablo"}, {"ts": "2026-03-06T15:17:25", "name": "Jesús"}, {"ts": "2026-03-06T15:43:41", "name": "Jesús"}, {"ts": "2026-03-06T22:33:23", "name": "Sendra"}, {"ts": "2026-03-06T23:49:15", "name": "Raúl"}, {"ts": "2026-03-07T01:22:24", "name": "Maldo"}, {"ts": "2026-03-07T07:43:43", "name": "Jesús"}, {"ts": "2026-03-07T08:31:12", "name": "Maldo"}, {"ts": "2026-03-07T09:47:15", "name": "Pablo"}, {"ts": "2026-03-07T10:01:25", "name": "Jesús"}, {"ts": "2026-03-07T10:01:35", "name": "Raúl"}, {"ts": "2026-03-07T10:22:09", "name": "Jesús"}, {"ts": "2026-03-07T12:13:10", "name": "Pablo"}, {"ts": "2026-03-07T12:13:36", "name": "Sergio"}, {"ts": "2026-03-07T18:32:51", "name": "Sergio"}, {"ts": "2026-03-07T18:59:35", "name": "Jesús"}, {"ts": "2026-03-07T20:42:45", "name": "Pablo"}, {"ts": "2026-03-07T22:12:36", "name": "Maldo"}, {"ts": "2026-03-07T23:05:02", "name": "Raúl"}, {"ts": "2026-03-07T23:33:56", "name": "Jesús"}, {"ts": "2026-03-07T23:49:10", "name": "Raúl"}, {"ts": "2026-03-08T07:05:40", "name": "Sergio"}, {"ts": "2026-03-08T07:05:54", "name": "Sendra"}, {"ts": "2026-03-08T07:31:24", "name": "Sendra"}, {"ts": "2026-03-08T09:04:56", "name": "Jesús"}, {"ts": "2026-03-08T09:24:54", "name": "Jesús"}, {"ts": "2026-03-08T09:47:09", "name": "Pablo"}, {"ts": "2026-03-08T10:46:34", "name": "Maldo"}, {"ts": "2026-03-08T11:18:29", "name": "Sendra"}, {"ts": "2026-03-08T12:55:16", "name": "Maldo"}, {"ts": "2026-03-08T13:02:01", "name": "Pablo"}, {"ts": "2026-03-08T17:25:37", "name": "Jesús"}, {"ts": "2026-03-08T17:54:45", "name": "Sendra"}, {"ts": "2026-03-08T18:55:49", "name": "Sendra"}, {"ts": "2026-03-08T19:16:57", "name": "Pablo"}, {"ts": "2026-03-08T19:30:48", "name": "Sergio"}, {"ts": "2026-03-08T21:49:53", "name": "Sendra"}, {"ts": "2026-03-08T21:58:35", "name": "Maldo"}, {"ts": "2026-03-09T01:06:09", "name": "Raúl"}, {"ts": "2026-03-09T02:05:11", "name": "Maldo"}, {"ts": "2026-03-09T04:57:42", "name": "Sendra"}, {"ts": "2026-03-09T07:22:01", "name": "Sendra"}, {"ts": "2026-03-09T10:08:38", "name": "Sendra"}, {"ts": "2026-03-09T10:41:02", "name": "Jesús"}, {"ts": "2026-03-09T10:59:26", "name": "Raúl"}, {"ts": "2026-03-09T11:20:20", "name": "Pablo"}, {"ts": "2026-03-09T11:48:08", "name": "Jesús"}, {"ts": "2026-03-09T14:55:19", "name": "Maldo"}, {"ts": "2026-03-09T15:08:47", "name": "Jesús"}, {"ts": "2026-03-09T16:00:26", "name": "Raúl"}, {"ts": "2026-03-09T16:15:47", "name": "Pablo"}, {"ts": "2026-03-09T16:30:11", "name": "Maldo"}, {"ts": "2026-03-09T17:39:31", "name": "Sergio"}, {"ts": "2026-03-09T19:03:12", "name": "Jesús"}, {"ts": "2026-03-10T07:10:47", "name": "Sergio"}, {"ts": "2026-03-10T08:39:00", "name": "Pablo"}, {"ts": "2026-03-10T09:24:55", "name": "Jesús"}, {"ts": "2026-03-10T09:31:32", "name": "Pablo"}, {"ts": "2026-03-10T09:36:35", "name": "Jesús"}, {"ts": "2026-03-10T11:19:55", "name": "Raúl"}, {"ts": "2026-03-10T13:08:29", "name": "Sergio"}, {"ts": "2026-03-10T13:38:22", "name": "Sendra"}, {"ts": "2026-03-10T15:27:06", "name": "Jesús"}, {"ts": "2026-03-10T17:36:55", "name": "Pablo"}, {"ts": "2026-03-10T17:38:29", "name": "Maldo"}, {"ts": "2026-03-10T20:16:48", "name": "Raúl"}, {"ts": "2026-03-10T20:58:20", "name": "Sendra"}, {"ts": "2026-03-10T21:33:23", "name": "Maldo"}, {"ts": "2026-03-11T08:50:57", "name": "Jesús"}, {"ts": "2026-03-11T10:12:11", "name": "Jesús"}, {"ts": "2026-03-11T10:14:44", "name": "Sergio"}, {"ts": "2026-03-11T11:34:40", "name": "Pablo"}, {"ts": "2026-03-11T12:17:21", "name": "Sergio"}, {"ts": "2026-03-11T12:21:20", "name": "Jesús"}, {"ts": "2026-03-11T15:10:07", "name": "Jesús"}, {"ts": "2026-03-11T16:09:09", "name": "Raúl"}, {"ts": "2026-03-11T16:09:25", "name": "Maldo"}, {"ts": "2026-03-11T19:15:50", "name": "Raúl"}, {"ts": "2026-03-11T19:37:37", "name": "Maldo"}, {"ts": "2026-03-11T23:57:16", "name": "Raúl"}, {"ts": "2026-03-12T08:31:28", "name": "Sendra"}, {"ts": "2026-03-12T09:23:14", "name": "Jesús"}, {"ts": "2026-03-12T09:54:12", "name": "Raúl"}, {"ts": "2026-03-12T13:02:46", "name": "Pablo"}, {"ts": "2026-03-12T13:32:28", "name": "Sendra"}, {"ts": "2026-03-12T14:44:26", "name": "Sendra"}, {"ts": "2026-03-12T15:04:44", "name": "Raúl"}, {"ts": "2026-03-12T15:08:46", "name": "Jesús"}, {"ts": "2026-03-12T17:00:29", "name": "Maldo"}, {"ts": "2026-03-12T20:33:02", "name": "Raúl"}, {"ts": "2026-03-13T06:46:23", "name": "Sergio"}, {"ts": "2026-03-13T08:00:10", "name": "Sendra"}, {"ts": "2026-03-13T09:01:50", "name": "Jesús"}, {"ts": "2026-03-13T10:21:54", "name": "Jesús"}, {"ts": "2026-03-13T12:53:13", "name": "Pablo"}, {"ts": "2026-03-13T16:33:15", "name": "Maldo"}, {"ts": "2026-03-13T17:11:59", "name": "Jesús"}, {"ts": "2026-03-13T21:06:47", "name": "Maldo"}, {"ts": "2026-03-13T21:17:14", "name": "Raúl"}, {"ts": "2026-03-13T23:22:03", "name": "Jesús"}, {"ts": "2026-03-14T07:37:08", "name": "Sendra"}, {"ts": "2026-03-14T08:40:03", "name": "Jesús"}, {"ts": "2026-03-14T10:46:44", "name": "Maldo"}, {"ts": "2026-03-14T11:01:20", "name": "Sendra"}, {"ts": "2026-03-14T11:09:47", "name": "Sergio"}, {"ts": "2026-03-14T11:11:11", "name": "Jesús"}, {"ts": "2026-03-14T11:25:43", "name": "Sendra"}, {"ts": "2026-03-14T13:25:17", "name": "Pablo"}, {"ts": "2026-03-14T13:45:53", "name": "Raúl"}, {"ts": "2026-03-14T14:15:28", "name": "Raúl"}, {"ts": "2026-03-14T14:41:48", "name": "Maldo"}, {"ts": "2026-03-14T15:03:38", "name": "Sendra"}, {"ts": "2026-03-14T16:12:58", "name": "Maldo"}, {"ts": "2026-03-14T19:00:35", "name": "Jesús"}, {"ts": "2026-03-15T00:58:06", "name": "Sendra"}, {"ts": "2026-03-15T07:15:08", "name": "Jesús"}, {"ts": "2026-03-15T07:37:50", "name": "Jesús"}, {"ts": "2026-03-15T08:25:50", "name": "Sergio"}, {"ts": "2026-03-15T09:15:15", "name": "Sendra"}, {"ts": "2026-03-15T09:39:48", "name": "Pablo"}, {"ts": "2026-03-15T10:15:01", "name": "Maldo"}, {"ts": "2026-03-15T11:31:55", "name": "Pablo"}, {"ts": "2026-03-15T12:04:59", "name": "Raúl"}, {"ts": "2026-03-15T19:31:34", "name": "Raúl"}, {"ts": "2026-03-15T19:50:39", "name": "Sergio"}, {"ts": "2026-03-15T20:27:49", "name": "Maldo"}, {"ts": "2026-03-15T21:31:40", "name": "Maldo"}, {"ts": "2026-03-15T21:47:01", "name": "Sendra"}, {"ts": "2026-03-15T23:12:39", "name": "Maldo"}, {"ts": "2026-03-15T23:46:01", "name": "Jesús"}, {"ts": "2026-03-16T00:09:51", "name": "Raúl"}, {"ts": "2026-03-16T08:00:06", "name": "Pablo"}, {"ts": "2026-03-16T08:29:57", "name": "Pablo"}, {"ts": "2026-03-16T08:33:17", "name": "Jesús"}, {"ts": "2026-03-16T09:40:48", "name": "Jesús"}, {"ts": "2026-03-16T13:41:07", "name": "Pablo"}, {"ts": "2026-03-16T16:04:15", "name": "Jesús"}, {"ts": "2026-03-16T16:04:40", "name": "Sendra"}, {"ts": "2026-03-16T16:07:41", "name": "Raúl"}, {"ts": "2026-03-16T19:43:26", "name": "Maldo"}, {"ts": "2026-03-16T19:44:53", "name": "Sergio"}, {"ts": "2026-03-16T21:12:20", "name": "Raúl"}, {"ts": "2026-03-16T22:54:34", "name": "Maldo"}, {"ts": "2026-03-16T23:58:27", "name": "Raúl"}, {"ts": "2026-03-17T08:53:31", "name": "Pablo"}, {"ts": "2026-03-17T09:13:46", "name": "Maldo"}, {"ts": "2026-03-17T09:34:26", "name": "Jesús"}, {"ts": "2026-03-17T10:05:55", "name": "Raúl"}, {"ts": "2026-03-17T15:38:09", "name": "Jesús"}, {"ts": "2026-03-17T15:51:50", "name": "Sergio"}, {"ts": "2026-03-17T16:04:26", "name": "Raúl"}, {"ts": "2026-03-17T16:13:49", "name": "Maldo"}, {"ts": "2026-03-17T16:53:06", "name": "Sendra"}, {"ts": "2026-03-17T16:54:05", "name": "Pablo"}, {"ts": "2026-03-17T16:54:22", "name": "Maldo"}, {"ts": "2026-03-17T20:12:46", "name": "Raúl"}, {"ts": "2026-03-18T01:31:49", "name": "Maldo"}, {"ts": "2026-03-18T09:43:24", "name": "Jesús"}, {"ts": "2026-03-18T09:52:08", "name": "Pablo"}, {"ts": "2026-03-18T10:20:51", "name": "Jesús"}, {"ts": "2026-03-18T11:10:53", "name": "Jesús"}, {"ts": "2026-03-18T11:35:37", "name": "Raúl"}, {"ts": "2026-03-18T13:12:44", "name": "Sergio"}, {"ts": "2026-03-18T13:49:19", "name": "Sendra"}, {"ts": "2026-03-18T14:37:25", "name": "Raúl"}, {"ts": "2026-03-18T15:10:07", "name": "Jesús"}, {"ts": "2026-03-18T16:08:18", "name": "Raúl"}, {"ts": "2026-03-18T18:41:55", "name": "Pablo"}, {"ts": "2026-03-18T19:16:39", "name": "Sergio"}, {"ts": "2026-03-18T19:20:40", "name": "Raúl"}, {"ts": "2026-03-18T19:53:17", "name": "Maldo"}, {"ts": "2026-03-18T23:13:17", "name": "Maldo"}, {"ts": "2026-03-18T23:58:05", "name": "Raúl"}, {"ts": "2026-03-19T00:22:43", "name": "Sendra"}, {"ts": "2026-03-19T09:37:01", "name": "Jesús"}, {"ts": "2026-03-19T10:14:51", "name": "Raúl"}, {"ts": "2026-03-19T10:21:35", "name": "Sendra"}, {"ts": "2026-03-19T13:14:41", "name": "Pablo"}, {"ts": "2026-03-19T14:51:41", "name": "Jesús"}, {"ts": "2026-03-19T15:30:00", "name": "Maldo"}, {"ts": "2026-03-19T16:10:16", "name": "Raúl"}, {"ts": "2026-03-19T16:13:21", "name": "Maldo"}, {"ts": "2026-03-19T16:16:51", "name": "Pablo"}, {"ts": "2026-03-19T20:01:21", "name": "Sergio"}, {"ts": "2026-03-19T20:18:07", "name": "Raúl"}, {"ts": "2026-03-19T20:30:11", "name": "Maldo"}, {"ts": "2026-03-20T00:20:38", "name": "Maldo"}, {"ts": "2026-03-20T01:39:19", "name": "Raúl"}, {"ts": "2026-03-20T06:49:40", "name": "Sergio"}, {"ts": "2026-03-20T07:52:33", "name": "Sendra"}, {"ts": "2026-03-20T09:50:13", "name": "Jesús"}, {"ts": "2026-03-20T10:39:19", "name": "Raúl"}, {"ts": "2026-03-20T14:37:12", "name": "Jesús"}, {"ts": "2026-03-20T15:29:16", "name": "Jesús"}, {"ts": "2026-03-20T15:42:00", "name": "Raúl"}, {"ts": "2026-03-20T16:38:11", "name": "Pablo"}, {"ts": "2026-03-20T22:56:50", "name": "Raúl"}, {"ts": "2026-03-21T08:55:03", "name": "Maldo"}, {"ts": "2026-03-21T09:29:00", "name": "Jesús"}, {"ts": "2026-03-21T10:33:25", "name": "Jesús"}, {"ts": "2026-03-21T11:09:16", "name": "Jesús"}, {"ts": "2026-03-21T11:13:47", "name": "Raúl"}, {"ts": "2026-03-21T11:16:57", "name": "Maldo"}, {"ts": "2026-03-21T12:39:46", "name": "Pablo"}, {"ts": "2026-03-21T13:13:15", "name": "Maldo"}, {"ts": "2026-03-21T14:48:55", "name": "Raúl"}, {"ts": "2026-03-21T14:49:30", "name": "Sergio"}, {"ts": "2026-03-21T16:20:04", "name": "Jesús"}, {"ts": "2026-03-21T17:01:29", "name": "Sendra"}, {"ts": "2026-03-21T17:31:29", "name": "Maldo"}, {"ts": "2026-03-21T22:15:18", "name": "Raúl"}, {"ts": "2026-03-22T08:38:42", "name": "Raúl"}, {"ts": "2026-03-22T09:26:40", "name": "Jesús"}, {"ts": "2026-03-22T10:16:05", "name": "Sendra"}, {"ts": "2026-03-22T11:18:01", "name": "Pablo"}, {"ts": "2026-03-22T16:04:15", "name": "Maldo"}, {"ts": "2026-03-22T16:44:00", "name": "Sendra"}, {"ts": "2026-03-22T16:51:46", "name": "Maldo"}, {"ts": "2026-03-22T18:45:33", "name": "Jesús"}, {"ts": "2026-03-22T19:03:13", "name": "Pablo"}, {"ts": "2026-03-22T21:47:47", "name": "Maldo"}, {"ts": "2026-03-23T07:48:41", "name": "Sendra"}, {"ts": "2026-03-23T08:47:31", "name": "Jesús"}, {"ts": "2026-03-23T09:08:55", "name": "Pablo"}, {"ts": "2026-03-23T09:22:18", "name": "Sergio"}, {"ts": "2026-03-23T11:19:28", "name": "Raúl"}, {"ts": "2026-03-23T12:21:42", "name": "Raúl"}, {"ts": "2026-03-23T13:17:51", "name": "Pablo"}, {"ts": "2026-03-23T14:22:45", "name": "Maldo"}, {"ts": "2026-03-23T15:04:34", "name": "Jesús"}, {"ts": "2026-03-23T15:07:24", "name": "Sendra"}, {"ts": "2026-03-23T16:10:38", "name": "Raúl"}, {"ts": "2026-03-23T18:49:50", "name": "Pablo"}, {"ts": "2026-03-23T19:59:04", "name": "Sergio"}, {"ts": "2026-03-23T22:00:55", "name": "Raúl"}, {"ts": "2026-03-23T22:43:45", "name": "Jesús"}, {"ts": "2026-03-23T22:50:49", "name": "Raúl"}, {"ts": "2026-03-24T08:43:41", "name": "Sergio"}, {"ts": "2026-03-24T09:41:41", "name": "Jesús"}, {"ts": "2026-03-24T09:54:08", "name": "Raúl"}, {"ts": "2026-03-24T09:54:52", "name": "Sergio"}, {"ts": "2026-03-24T10:13:33", "name": "Jesús"}, {"ts": "2026-03-24T13:54:20", "name": "Pablo"}, {"ts": "2026-03-24T16:00:26", "name": "Raúl"}, {"ts": "2026-03-24T16:02:28", "name": "Jesús"}, {"ts": "2026-03-24T16:22:18", "name": "Sendra"}, {"ts": "2026-03-24T18:17:09", "name": "Pablo"}, {"ts": "2026-03-24T18:57:50", "name": "Maldo"}, {"ts": "2026-03-24T20:14:52", "name": "Raúl"}, {"ts": "2026-03-25T01:09:48", "name": "Maldo"}, {"ts": "2026-03-25T07:04:26", "name": "Sergio"}, {"ts": "2026-03-25T09:33:34", "name": "Jesús"}, {"ts": "2026-03-25T10:45:49", "name": "Jesús"}, {"ts": "2026-03-25T10:46:03", "name": "Sergio"}, {"ts": "2026-03-25T12:48:48", "name": "Raúl"}, {"ts": "2026-03-25T14:46:30", "name": "Jesús"}, {"ts": "2026-03-25T15:03:38", "name": "Sendra"}, {"ts": "2026-03-25T15:23:07", "name": "Maldo"}, {"ts": "2026-03-25T16:04:51", "name": "Raúl"}, {"ts": "2026-03-25T16:40:50", "name": "Pablo"}, {"ts": "2026-03-25T16:59:38", "name": "Maldo"}, {"ts": "2026-03-25T19:19:47", "name": "Raúl"}, {"ts": "2026-03-26T01:18:44", "name": "Raúl"}, {"ts": "2026-03-26T07:51:48", "name": "Sendra"}, {"ts": "2026-03-26T08:48:57", "name": "Jesús"}, {"ts": "2026-03-26T11:07:17", "name": "Raúl"}, {"ts": "2026-03-26T14:59:15", "name": "Jesús"}, {"ts": "2026-03-26T16:02:50", "name": "Raúl"}, {"ts": "2026-03-26T16:48:53", "name": "Sendra"}, {"ts": "2026-03-26T16:54:58", "name": "Pablo"}, {"ts": "2026-03-26T20:18:25", "name": "Raúl"}, {"ts": "2026-03-26T20:36:00", "name": "Sergio"}, {"ts": "2026-03-27T07:19:21", "name": "Jesús"}, {"ts": "2026-03-27T07:50:24", "name": "Sendra"}, {"ts": "2026-03-27T07:54:18", "name": "Sergio"}, {"ts": "2026-03-27T08:47:17", "name": "Jesús"}, {"ts": "2026-03-27T10:39:03", "name": "Raúl"}, {"ts": "2026-03-27T13:46:29", "name": "Raúl"}, {"ts": "2026-03-27T13:48:11", "name": "Pablo"}, {"ts": "2026-03-27T14:24:43", "name": "Jesús"}, {"ts": "2026-03-27T15:59:44", "name": "Raúl"}, {"ts": "2026-03-27T16:01:51", "name": "Pablo"}, {"ts": "2026-03-27T16:35:29", "name": "Maldo"}, {"ts": "2026-03-27T17:28:26", "name": "Maldo"}, {"ts": "2026-03-27T21:12:53", "name": "Jesús"}, {"ts": "2026-03-28T08:43:16", "name": "Sergio"}, {"ts": "2026-03-28T08:44:08", "name": "Jesús"}, {"ts": "2026-03-28T09:59:53", "name": "Pablo"}, {"ts": "2026-03-28T11:21:37", "name": "Sendra"}, {"ts": "2026-03-28T12:07:36", "name": "Maldo"}, {"ts": "2026-03-28T13:03:58", "name": "Sergio"}, {"ts": "2026-03-28T15:48:12", "name": "Jesús"}, {"ts": "2026-03-28T16:21:06", "name": "Pablo"}, {"ts": "2026-03-28T16:23:10", "name": "Maldo"}, {"ts": "2026-03-28T16:41:32", "name": "Sendra"}, {"ts": "2026-03-28T17:11:21", "name": "Pablo"}, {"ts": "2026-03-28T17:43:13", "name": "Raúl"}, {"ts": "2026-03-28T18:04:00", "name": "Sergio"}, {"ts": "2026-03-28T19:26:53", "name": "Sergio"}, {"ts": "2026-03-28T20:52:37", "name": "Pablo"}, {"ts": "2026-03-28T23:03:55", "name": "Raúl"}, {"ts": "2026-03-28T23:09:06", "name": "Sendra"}, {"ts": "2026-03-29T08:15:44", "name": "Raúl"}, {"ts": "2026-03-29T08:22:55", "name": "Jesús"}, {"ts": "2026-03-29T09:22:19", "name": "Sendra"}, {"ts": "2026-03-29T10:19:03", "name": "Sergio"}, {"ts": "2026-03-29T10:36:59", "name": "Pablo"}, {"ts": "2026-03-29T12:06:24", "name": "Raúl"}, {"ts": "2026-03-29T13:01:48", "name": "Sendra"}, {"ts": "2026-03-29T14:08:27", "name": "Sendra"}, {"ts": "2026-03-29T14:09:31", "name": "Pablo"}, {"ts": "2026-03-29T15:47:35", "name": "Maldo"}, {"ts": "2026-03-29T16:47:07", "name": "Jesús"}, {"ts": "2026-03-29T17:25:06", "name": "Raúl"}, {"ts": "2026-03-29T22:33:15", "name": "Raúl"}, {"ts": "2026-03-29T22:34:18", "name": "Maldo"}, {"ts": "2026-03-29T22:37:35", "name": "Sendra"}, {"ts": "2026-03-29T22:38:44", "name": "Sergio"}, {"ts": "2026-03-29T23:02:54", "name": "Maldo"}, {"ts": "2026-03-30T01:26:28", "name": "Maldo"}, {"ts": "2026-03-30T08:03:56", "name": "Sendra"}, {"ts": "2026-03-30T09:34:48", "name": "Jesús"}, {"ts": "2026-03-30T09:50:48", "name": "Sergio"}, {"ts": "2026-03-30T12:40:09", "name": "Raúl"}, {"ts": "2026-03-30T15:01:11", "name": "Jesús"}, {"ts": "2026-03-30T17:38:14", "name": "Raúl"}, {"ts": "2026-03-30T17:56:03", "name": "Sergio"}, {"ts": "2026-03-30T18:03:28", "name": "Maldo"}, {"ts": "2026-03-30T19:29:05", "name": "Sergio"}, {"ts": "2026-03-30T20:54:42", "name": "Maldo"}, {"ts": "2026-03-30T22:29:42", "name": "Sendra"}, {"ts": "2026-03-30T22:31:39", "name": "Raúl"}, {"ts": "2026-03-30T23:22:31", "name": "Sendra"}, {"ts": "2026-03-30T23:38:12", "name": "Maldo"}, {"ts": "2026-03-31T00:24:46", "name": "Maldo"}, {"ts": "2026-03-31T07:33:07", "name": "Sendra"}, {"ts": "2026-03-31T09:12:37", "name": "Pablo"}, {"ts": "2026-03-31T09:41:30", "name": "Raúl"}, {"ts": "2026-03-31T10:04:03", "name": "Jesús"}, {"ts": "2026-03-31T11:58:38", "name": "Sergio"}, {"ts": "2026-03-31T15:00:29", "name": "Sendra"}, {"ts": "2026-03-31T17:31:33", "name": "Jesús"}, {"ts": "2026-03-31T17:50:02", "name": "Maldo"}, {"ts": "2026-03-31T19:01:55", "name": "Sergio"}, {"ts": "2026-03-31T19:51:58", "name": "Maldo"}, {"ts": "2026-03-31T20:02:38", "name": "Raúl"}, {"ts": "2026-03-31T20:31:25", "name": "Sergio"}, {"ts": "2026-04-01T00:52:06", "name": "Raúl"}, {"ts": "2026-04-01T08:22:08", "name": "Sendra"}, {"ts": "2026-04-01T09:37:25", "name": "Raúl"}, {"ts": "2026-04-01T09:53:42", "name": "Jesús"}, {"ts": "2026-04-01T10:19:51", "name": "Raúl"}, {"ts": "2026-04-01T10:51:16", "name": "Jesús"}, {"ts": "2026-04-01T11:16:04", "name": "Sergio"}, {"ts": "2026-04-01T15:38:05", "name": "Pablo"}, {"ts": "2026-04-01T23:39:09", "name": "Sergio"}, {"ts": "2026-04-02T00:07:36", "name": "Jesús"}, {"ts": "2026-04-02T00:13:47", "name": "Maldo"}, {"ts": "2026-04-02T00:49:24", "name": "Raúl"}, {"ts": "2026-04-02T08:48:25", "name": "Sendra"}, {"ts": "2026-04-02T09:12:46", "name": "Sergio"}, {"ts": "2026-04-02T09:13:55", "name": "Raúl"}, {"ts": "2026-04-02T09:52:00", "name": "Jesús"}, {"ts": "2026-04-02T09:57:18", "name": "Sergio"}, {"ts": "2026-04-02T09:59:57", "name": "Raúl"}, {"ts": "2026-04-02T10:30:02", "name": "Maldo"}, {"ts": "2026-04-02T13:32:29", "name": "Raúl"}, {"ts": "2026-04-02T13:47:27", "name": "Sergio"}, {"ts": "2026-04-02T16:05:05", "name": "Jesús"}, {"ts": "2026-04-02T17:55:53", "name": "Jesús"}, {"ts": "2026-04-02T20:35:31", "name": "Maldo"}, {"ts": "2026-04-02T23:07:12", "name": "Maldo"}, {"ts": "2026-04-02T23:56:41", "name": "Raúl"}, {"ts": "2026-04-03T08:26:29", "name": "Sendra"}, {"ts": "2026-04-03T08:42:07", "name": "Jesús"}, {"ts": "2026-04-03T09:46:59", "name": "Pablo"}, {"ts": "2026-04-03T09:58:29", "name": "Sendra"}, {"ts": "2026-04-03T10:02:15", "name": "Sergio"}, {"ts": "2026-04-03T10:02:51", "name": "Maldo"}, {"ts": "2026-04-03T10:14:36", "name": "Sergio"}, {"ts": "2026-04-03T13:46:23", "name": "Raúl"}, {"ts": "2026-04-03T15:23:15", "name": "Pablo"}, {"ts": "2026-04-03T17:38:36", "name": "Sergio"}, {"ts": "2026-04-03T19:04:07", "name": "Maldo"}, {"ts": "2026-04-03T19:56:27", "name": "Raúl"}, {"ts": "2026-04-03T21:17:15", "name": "Raúl"}, {"ts": "2026-04-03T21:37:59", "name": "Jesús"}, {"ts": "2026-04-04T00:46:00", "name": "Raúl"}, {"ts": "2026-04-04T07:53:27", "name": "Raúl"}, {"ts": "2026-04-04T08:33:06", "name": "Pablo"}, {"ts": "2026-04-04T08:58:50", "name": "Sendra"}, {"ts": "2026-04-04T10:12:34", "name": "Sergio"}, {"ts": "2026-04-04T11:00:27", "name": "Jesús"}, {"ts": "2026-04-04T11:39:57", "name": "Maldo"}, {"ts": "2026-04-04T15:32:49", "name": "Jesús"}, {"ts": "2026-04-04T17:58:54", "name": "Raúl"}, {"ts": "2026-04-04T19:15:13", "name": "Raúl"}, {"ts": "2026-04-04T22:27:46", "name": "Sendra"}, {"ts": "2026-04-05T08:17:48", "name": "Raúl"}, {"ts": "2026-04-05T08:54:47", "name": "Jesús"}, {"ts": "2026-04-05T09:17:46", "name": "Sendra"}, {"ts": "2026-04-05T11:12:59", "name": "Pablo"}, {"ts": "2026-04-05T11:46:11", "name": "Maldo"}, {"ts": "2026-04-05T12:19:22", "name": "Maldo"}, {"ts": "2026-04-05T13:50:01", "name": "Pablo"}, {"ts": "2026-04-05T14:04:41", "name": "Sergio"}, {"ts": "2026-04-05T14:47:12", "name": "Raúl"}, {"ts": "2026-04-05T16:34:13", "name": "Jesús"}, {"ts": "2026-04-05T18:00:01", "name": "Sergio"}, {"ts": "2026-04-05T18:49:41", "name": "Jesús"}, {"ts": "2026-04-05T20:28:49", "name": "Sergio"}, {"ts": "2026-04-05T22:17:35", "name": "Maldo"}, {"ts": "2026-04-05T22:52:53", "name": "Sendra"}, {"ts": "2026-04-06T00:02:22", "name": "Raúl"}, {"ts": "2026-04-06T07:50:44", "name": "Sendra"}, {"ts": "2026-04-06T08:53:30", "name": "Pablo"}, {"ts": "2026-04-06T09:02:19", "name": "Maldo"}, {"ts": "2026-04-06T09:07:38", "name": "Pablo"}, {"ts": "2026-04-06T09:52:25", "name": "Jesús"}, {"ts": "2026-04-06T11:02:37", "name": "Raúl"}, {"ts": "2026-04-06T12:04:00", "name": "Sergio"}, {"ts": "2026-04-06T12:28:20", "name": "Maldo"}, {"ts": "2026-04-06T13:24:18", "name": "Pablo"}, {"ts": "2026-04-06T13:54:01", "name": "Sendra"}, {"ts": "2026-04-06T15:16:33", "name": "Jesús"}, {"ts": "2026-04-06T15:17:55", "name": "Raúl"}, {"ts": "2026-04-06T18:17:12", "name": "Raúl"}, {"ts": "2026-04-06T21:45:36", "name": "Maldo"}, {"ts": "2026-04-06T23:58:36", "name": "Maldo"}, {"ts": "2026-04-07T07:43:28", "name": "Sendra"}, {"ts": "2026-04-07T08:37:06", "name": "Pablo"}, {"ts": "2026-04-07T09:55:53", "name": "Raúl"}, {"ts": "2026-04-07T10:14:41", "name": "Jesús"}, {"ts": "2026-04-07T10:21:58", "name": "Sergio"}, {"ts": "2026-04-07T11:17:31", "name": "Jesús"}, {"ts": "2026-04-07T11:18:01", "name": "Raúl"}, {"ts": "2026-04-07T15:03:39", "name": "Jesús"}, {"ts": "2026-04-07T16:05:53", "name": "Raúl"}, {"ts": "2026-04-07T16:12:42", "name": "Jesús"}, {"ts": "2026-04-07T20:16:13", "name": "Raúl"}, {"ts": "2026-04-07T22:10:14", "name": "Sendra"}, {"ts": "2026-04-07T22:18:12", "name": "Maldo"}, {"ts": "2026-04-08T00:04:28", "name": "Maldo"}, {"ts": "2026-04-08T00:34:14", "name": "Raúl"}, {"ts": "2026-04-08T07:30:14", "name": "Maldo"}, {"ts": "2026-04-08T09:35:46", "name": "Jesús"}, {"ts": "2026-04-08T11:08:10", "name": "Sergio"}, {"ts": "2026-04-08T11:13:43", "name": "Raúl"}, {"ts": "2026-04-08T11:22:48", "name": "Jesús"}, {"ts": "2026-04-08T15:06:50", "name": "Jesús"}, {"ts": "2026-04-08T16:06:21", "name": "Raúl"}, {"ts": "2026-04-08T16:20:15", "name": "Pablo"}, {"ts": "2026-04-08T16:37:49", "name": "Sendra"}, {"ts": "2026-04-08T19:08:56", "name": "Jesús"}, {"ts": "2026-04-08T19:21:23", "name": "Raúl"}, {"ts": "2026-04-08T19:47:09", "name": "Maldo"}, {"ts": "2026-04-08T22:29:53", "name": "Sergio"}, {"ts": "2026-04-08T23:36:47", "name": "Raúl"}, {"ts": "2026-04-08T23:37:26", "name": "Maldo"}, {"ts": "2026-04-09T07:50:16", "name": "Sendra"}, {"ts": "2026-04-09T09:24:55", "name": "Sergio"}, {"ts": "2026-04-09T09:39:44", "name": "Raúl"}, {"ts": "2026-04-09T09:44:25", "name": "Jesús"}, {"ts": "2026-04-09T11:17:32", "name": "Raúl"}, {"ts": "2026-04-09T14:58:20", "name": "Jesús"}, {"ts": "2026-04-09T16:02:08", "name": "Raúl"}, {"ts": "2026-04-09T17:17:01", "name": "Pablo"}, {"ts": "2026-04-09T17:17:20", "name": "Maldo"}, {"ts": "2026-04-09T20:21:20", "name": "Raúl"}, {"ts": "2026-04-09T23:33:51", "name": "Sendra"}, {"ts": "2026-04-10T07:09:35", "name": "Sergio"}, {"ts": "2026-04-10T09:49:14", "name": "Jesús"}, {"ts": "2026-04-10T10:44:20", "name": "Raúl"}, {"ts": "2026-04-10T10:48:33", "name": "Jesús"}, {"ts": "2026-04-10T11:10:25", "name": "Pablo"}, {"ts": "2026-04-10T13:36:43", "name": "Sergio"}, {"ts": "2026-04-10T14:07:29", "name": "Sendra"}, {"ts": "2026-04-10T14:48:32", "name": "Jesús"}, {"ts": "2026-04-10T14:58:35", "name": "Raúl"}, {"ts": "2026-04-10T15:16:24", "name": "Pablo"}, {"ts": "2026-04-10T18:32:52", "name": "Sendra"}, {"ts": "2026-04-11T00:32:04", "name": "Raúl"}, {"ts": "2026-04-11T08:08:17", "name": "Raúl"}, {"ts": "2026-04-11T08:22:47", "name": "Sergio"}, {"ts": "2026-04-11T10:12:14", "name": "Jesús"}, {"ts": "2026-04-11T16:30:58", "name": "Raúl"}, {"ts": "2026-04-11T17:26:02", "name": "Maldo"}, {"ts": "2026-04-11T21:13:47", "name": "Jesús"}, {"ts": "2026-04-11T23:35:25", "name": "Raúl"}, {"ts": "2026-04-12T00:24:43", "name": "Maldo"}, {"ts": "2026-04-12T00:39:11", "name": "Sergio"}, {"ts": "2026-04-12T01:33:14", "name": "Maldo"}, {"ts": "2026-04-12T07:52:26", "name": "Sendra"}, {"ts": "2026-04-12T08:19:06", "name": "Raúl"}, {"ts": "2026-04-12T08:19:23", "name": "Sergio"}, {"ts": "2026-04-12T08:20:18", "name": "Sendra"}, {"ts": "2026-04-12T08:31:38", "name": "Pablo"}, {"ts": "2026-04-12T09:05:10", "name": "Sendra"}, {"ts": "2026-04-12T09:17:46", "name": "Pablo"}, {"ts": "2026-04-12T10:00:14", "name": "Maldo"}, {"ts": "2026-04-12T10:43:50", "name": "Sendra"}, {"ts": "2026-04-12T10:52:52", "name": "Maldo"}, {"ts": "2026-04-12T10:58:57", "name": "Jesús"}, {"ts": "2026-04-12T11:03:18", "name": "Pablo"}, {"ts": "2026-04-12T12:19:07", "name": "Raúl"}, {"ts": "2026-04-12T12:22:01", "name": "Jesús"}, {"ts": "2026-04-12T13:03:26", "name": "Maldo"}, {"ts": "2026-04-12T13:28:36", "name": "Raúl"}, {"ts": "2026-04-12T14:52:58", "name": "Maldo"}, {"ts": "2026-04-12T15:43:29", "name": "Jesús"}, {"ts": "2026-04-12T17:31:18", "name": "Maldo"}, {"ts": "2026-04-12T17:40:35", "name": "Pablo"}, {"ts": "2026-04-12T17:57:09", "name": "Sergio"}, {"ts": "2026-04-12T20:27:12", "name": "Sergio"}, {"ts": "2026-04-12T23:51:52", "name": "Jesús"}, {"ts": "2026-04-13T00:45:57", "name": "Raúl"}, {"ts": "2026-04-13T03:14:04", "name": "Maldo"}, {"ts": "2026-04-13T09:33:01", "name": "Jesús"}, {"ts": "2026-04-13T09:56:31", "name": "Sergio"}, {"ts": "2026-04-13T09:58:08", "name": "Maldo"}, {"ts": "2026-04-13T10:27:33", "name": "Sendra"}, {"ts": "2026-04-13T12:10:43", "name": "Raúl"}, {"ts": "2026-04-13T12:33:03", "name": "Pablo"}, {"ts": "2026-04-13T15:09:30", "name": "Jesús"}, {"ts": "2026-04-13T16:05:34", "name": "Raúl"}, {"ts": "2026-04-13T17:37:44", "name": "Pablo"}, {"ts": "2026-04-13T20:02:48", "name": "Sergio"}, {"ts": "2026-04-13T20:57:10", "name": "Raúl"}, {"ts": "2026-04-14T01:16:05", "name": "Raúl"}, {"ts": "2026-04-14T07:51:57", "name": "Sendra"}, {"ts": "2026-04-14T08:37:36", "name": "Pablo"}, {"ts": "2026-04-14T09:44:20", "name": "Jesús"}, {"ts": "2026-04-14T09:53:35", "name": "Raúl"}, {"ts": "2026-04-14T13:16:03", "name": "Pablo"}, {"ts": "2026-04-14T13:18:15", "name": "Sergio"}, {"ts": "2026-04-14T13:57:49", "name": "Sendra"}, {"ts": "2026-04-14T16:00:37", "name": "Raúl"}, {"ts": "2026-04-14T16:03:50", "name": "Jesús"}, {"ts": "2026-04-14T16:05:20", "name": "Sergio"}, {"ts": "2026-04-14T20:13:43", "name": "Raúl"}, {"ts": "2026-04-14T21:00:13", "name": "Sergio"}, {"ts": "2026-04-14T21:40:07", "name": "Pablo"}, {"ts": "2026-04-15T01:41:30", "name": "Maldo"}, {"ts": "2026-04-15T07:45:41", "name": "Sendra"}, {"ts": "2026-04-15T09:19:50", "name": "Jesús"}, {"ts": "2026-04-15T11:20:28", "name": "Raúl"}, {"ts": "2026-04-15T15:21:22", "name": "Jesús"}, {"ts": "2026-04-15T15:29:56", "name": "Sendra"}, {"ts": "2026-04-15T15:51:54", "name": "Raúl"}, {"ts": "2026-04-15T18:12:52", "name": "Jesús"}, {"ts": "2026-04-15T18:47:30", "name": "Pablo"}, {"ts": "2026-04-15T19:07:39", "name": "Maldo"}, {"ts": "2026-04-15T19:17:14", "name": "Sergio"}, {"ts": "2026-04-15T19:28:44", "name": "Raúl"}, {"ts": "2026-04-16T07:21:25", "name": "Sendra"}, {"ts": "2026-04-16T09:18:26", "name": "Sergio"}, {"ts": "2026-04-16T09:33:42", "name": "Jesús"}, {"ts": "2026-04-16T09:43:24", "name": "Raúl"}, {"ts": "2026-04-16T09:51:44", "name": "Pablo"}, {"ts": "2026-04-16T15:17:26", "name": "Jesús"}, {"ts": "2026-04-16T15:21:19", "name": "Maldo"}, {"ts": "2026-04-16T16:05:02", "name": "Raúl"}, {"ts": "2026-04-16T17:07:00", "name": "Raúl"}, {"ts": "2026-04-16T17:08:46", "name": "Jesús"}, {"ts": "2026-04-16T20:25:55", "name": "Raúl"}, {"ts": "2026-04-16T22:59:59", "name": "Maldo"}, {"ts": "2026-04-16T23:37:30", "name": "Raúl"}, {"ts": "2026-04-17T07:19:14", "name": "Sergio"}, {"ts": "2026-04-17T08:00:08", "name": "Sendra"}, {"ts": "2026-04-17T08:34:23", "name": "Raúl"}, {"ts": "2026-04-17T08:44:05", "name": "Jesús"}, {"ts": "2026-04-17T08:52:53", "name": "Pablo"}, {"ts": "2026-04-17T09:20:04", "name": "Pablo"}, {"ts": "2026-04-17T09:28:12", "name": "Jesús"}, {"ts": "2026-04-17T15:13:02", "name": "Sendra"}, {"ts": "2026-04-17T16:00:51", "name": "Maldo"}, {"ts": "2026-04-17T17:09:53", "name": "Jesús"}, {"ts": "2026-04-17T17:12:33", "name": "Pablo"}, {"ts": "2026-04-17T17:22:25", "name": "Raúl"}, {"ts": "2026-04-18T08:23:29", "name": "Jesús"}, {"ts": "2026-04-18T09:00:48", "name": "Sendra"}, {"ts": "2026-04-18T09:02:22", "name": "Raúl"}, {"ts": "2026-04-18T09:13:19", "name": "Pablo"}, {"ts": "2026-04-18T09:26:54", "name": "Maldo"}, {"ts": "2026-04-18T09:27:19", "name": "Jesús"}, {"ts": "2026-04-18T16:38:08", "name": "Pablo"}, {"ts": "2026-04-18T18:11:40", "name": "Maldo"}, {"ts": "2026-04-18T18:47:53", "name": "Jesús"}, {"ts": "2026-04-18T18:48:37", "name": "Raúl"}, {"ts": "2026-04-18T22:04:42", "name": "Raúl"}, {"ts": "2026-04-18T23:51:24", "name": "Maldo"}, {"ts": "2026-04-18T23:59:27", "name": "Raúl"}, {"ts": "2026-04-19T00:39:30", "name": "Raúl"}, {"ts": "2026-04-19T07:43:12", "name": "Sendra"}, {"ts": "2026-04-19T08:42:38", "name": "Maldo"}, {"ts": "2026-04-19T08:44:26", "name": "Jesús"}, {"ts": "2026-04-19T09:01:46", "name": "Sergio"}, {"ts": "2026-04-19T09:02:29", "name": "Maldo"}, {"ts": "2026-04-19T09:20:17", "name": "Sendra"}, {"ts": "2026-04-19T09:27:34", "name": "Pablo"}, {"ts": "2026-04-19T09:44:49", "name": "Raúl"}, {"ts": "2026-04-19T10:04:18", "name": "Jesús"}, {"ts": "2026-04-19T13:17:33", "name": "Sergio"}, {"ts": "2026-04-19T13:24:28", "name": "Sendra"}, {"ts": "2026-04-19T14:59:57", "name": "Sergio"}, {"ts": "2026-04-19T15:57:28", "name": "Maldo"}, {"ts": "2026-04-19T16:14:09", "name": "Jesús"}, {"ts": "2026-04-19T16:24:30", "name": "Raúl"}, {"ts": "2026-04-19T18:22:53", "name": "Sendra"}, {"ts": "2026-04-19T19:53:52", "name": "Pablo"}, {"ts": "2026-04-19T20:21:55", "name": "Raúl"}, {"ts": "2026-04-19T20:26:08", "name": "Jesús"}, {"ts": "2026-04-19T22:02:08", "name": "Maldo"}, {"ts": "2026-04-20T01:08:53", "name": "Maldo"}, {"ts": "2026-04-20T02:06:15", "name": "Maldo"}, {"ts": "2026-04-20T07:31:31", "name": "Maldo"}, {"ts": "2026-04-20T07:48:37", "name": "Sendra"}, {"ts": "2026-04-20T08:11:28", "name": "Pablo"}, {"ts": "2026-04-20T08:52:43", "name": "Jesús"}, {"ts": "2026-04-20T10:28:06", "name": "Raúl"}, {"ts": "2026-04-20T10:28:50", "name": "Jesús"}, {"ts": "2026-04-20T15:43:09", "name": "Jesús"}, {"ts": "2026-04-20T15:53:36", "name": "Raúl"}, {"ts": "2026-04-20T16:19:58", "name": "Sendra"}, {"ts": "2026-04-20T16:20:45", "name": "Maldo"}, {"ts": "2026-04-20T19:26:57", "name": "Maldo"}, {"ts": "2026-04-20T20:12:06", "name": "Sergio"}, {"ts": "2026-04-20T23:00:51", "name": "Raúl"}, {"ts": "2026-04-21T06:54:26", "name": "Sendra"}, {"ts": "2026-04-21T09:45:38", "name": "Jesús"}, {"ts": "2026-04-21T10:03:43", "name": "Raúl"}, {"ts": "2026-04-21T12:32:41", "name": "Pablo"}, {"ts": "2026-04-21T15:34:51", "name": "Jesús"}, {"ts": "2026-04-21T15:56:04", "name": "Raúl"}, {"ts": "2026-04-21T20:17:18", "name": "Raúl"}, {"ts": "2026-04-21T21:05:10", "name": "Pablo"}, {"ts": "2026-04-21T21:05:49", "name": "Jesús"}, {"ts": "2026-04-21T22:24:12", "name": "Maldo"}, {"ts": "2026-04-21T23:02:04", "name": "Sendra"}, {"ts": "2026-04-22T00:14:01", "name": "Raúl"}, {"ts": "2026-04-22T07:57:53", "name": "Maldo"}, {"ts": "2026-04-22T08:50:14", "name": "Jesús"}, {"ts": "2026-04-22T10:16:03", "name": "Sergio"}, {"ts": "2026-04-22T11:31:02", "name": "Jesús"}, {"ts": "2026-04-22T11:34:28", "name": "Raúl"}, {"ts": "2026-04-22T14:00:58", "name": "Pablo"}, {"ts": "2026-04-22T14:04:45", "name": "Sendra"}, {"ts": "2026-04-22T14:50:50", "name": "Pablo"}, {"ts": "2026-04-22T15:53:45", "name": "Jesús"}, {"ts": "2026-04-22T16:06:23", "name": "Raúl"}, {"ts": "2026-04-22T19:24:27", "name": "Raúl"}, {"ts": "2026-04-22T19:37:13", "name": "Maldo"}, {"ts": "2026-04-22T20:22:46", "name": "Jesús"}, {"ts": "2026-04-23T09:09:38", "name": "Jesús"}, {"ts": "2026-04-23T09:24:41", "name": "Raúl"}, {"ts": "2026-04-23T09:34:23", "name": "Pablo"}, {"ts": "2026-04-23T09:35:42", "name": "Sendra"}, {"ts": "2026-04-23T10:04:11", "name": "Sergio"}, {"ts": "2026-04-23T10:38:46", "name": "Pablo"}, {"ts": "2026-04-23T12:06:14", "name": "Jesús"}, {"ts": "2026-04-23T14:34:37", "name": "Jesús"}, {"ts": "2026-04-23T16:03:54", "name": "Raúl"}, {"ts": "2026-04-23T17:55:44", "name": "Jesús"}, {"ts": "2026-04-23T18:49:32", "name": "Pablo"}, {"ts": "2026-04-23T20:13:24", "name": "Raúl"}, {"ts": "2026-04-24T09:11:46", "name": "Jesús"}, {"ts": "2026-04-24T09:14:11", "name": "Pablo"}, {"ts": "2026-04-24T09:51:34", "name": "Sergio"}, {"ts": "2026-04-24T10:02:08", "name": "Sendra"}, {"ts": "2026-04-24T10:55:24", "name": "Jesús"}, {"ts": "2026-04-24T11:06:42", "name": "Pablo"}, {"ts": "2026-04-24T12:28:22", "name": "Sergio"}, {"ts": "2026-04-24T14:08:54", "name": "Raúl"}, {"ts": "2026-04-24T15:50:39", "name": "Maldo"}, {"ts": "2026-04-24T16:17:14", "name": "Jesús"}, {"ts": "2026-04-24T17:56:08", "name": "Raúl"}, {"ts": "2026-04-24T18:12:40", "name": "Sendra"}, {"ts": "2026-04-24T23:04:54", "name": "Raúl"}, {"ts": "2026-04-24T23:06:44", "name": "Pablo"}, {"ts": "2026-04-24T23:18:50", "name": "Jesús"}, {"ts": "2026-04-25T00:23:22", "name": "Maldo"}, {"ts": "2026-04-25T00:41:30", "name": "Raúl"}, {"ts": "2026-04-25T08:12:09", "name": "Sendra"}, {"ts": "2026-04-25T08:38:48", "name": "Raúl"}, {"ts": "2026-04-25T08:44:36", "name": "Sergio"}, {"ts": "2026-04-25T08:49:35", "name": "Jesús"}, {"ts": "2026-04-25T09:06:30", "name": "Pablo"}, {"ts": "2026-04-25T09:35:27", "name": "Sergio"}, {"ts": "2026-04-25T09:56:17", "name": "Jesús"}, {"ts": "2026-04-25T11:24:58", "name": "Jesús"}, {"ts": "2026-04-25T13:29:30", "name": "Pablo"}, {"ts": "2026-04-25T14:51:04", "name": "Maldo"}, {"ts": "2026-04-25T15:57:37", "name": "Maldo"}, {"ts": "2026-04-25T17:56:18", "name": "Raúl"}, {"ts": "2026-04-25T17:59:56", "name": "Sergio"}, {"ts": "2026-04-25T19:14:11", "name": "Sendra"}, {"ts": "2026-04-25T20:26:28", "name": "Raúl"}, {"ts": "2026-04-25T20:38:17", "name": "Sergio"}, {"ts": "2026-04-25T23:26:18", "name": "Jesús"}, {"ts": "2026-04-26T00:42:12", "name": "Maldo"}, {"ts": "2026-04-26T07:09:44", "name": "Sergio"}, {"ts": "2026-04-26T07:22:57", "name": "Sergio"}, {"ts": "2026-04-26T08:31:47", "name": "Sendra"}, {"ts": "2026-04-26T09:05:19", "name": "Maldo"}, {"ts": "2026-04-26T09:09:03", "name": "Raúl"}, {"ts": "2026-04-26T09:41:25", "name": "Sendra"}, {"ts": "2026-04-26T10:04:56", "name": "Jesús"}, {"ts": "2026-04-26T10:43:05", "name": "Pablo"}, {"ts": "2026-04-26T10:49:39", "name": "Maldo"}, {"ts": "2026-04-26T12:17:12", "name": "Jesús"}, {"ts": "2026-04-26T12:49:11", "name": "Pablo"}, {"ts": "2026-04-26T13:49:35", "name": "Sergio"}, {"ts": "2026-04-26T15:04:39", "name": "Raúl"}, {"ts": "2026-04-26T15:09:34", "name": "Maldo"}, {"ts": "2026-04-26T15:44:58", "name": "Jesús"}, {"ts": "2026-04-26T16:15:42", "name": "Maldo"}, {"ts": "2026-04-26T16:45:15", "name": "Sendra"}, {"ts": "2026-04-26T19:37:44", "name": "Pablo"}, {"ts": "2026-04-26T20:13:15", "name": "Sergio"}, {"ts": "2026-04-26T23:13:28", "name": "Sergio"}, {"ts": "2026-04-27T00:23:13", "name": "Raúl"}, {"ts": "2026-04-27T07:42:43", "name": "Sendra"}, {"ts": "2026-04-27T09:19:09", "name": "Jesús"}, {"ts": "2026-04-27T09:31:45", "name": "Sergio"}, {"ts": "2026-04-27T09:43:10", "name": "Pablo"}, {"ts": "2026-04-27T10:37:50", "name": "Raúl"}, {"ts": "2026-04-27T10:39:59", "name": "Jesús"}, {"ts": "2026-04-27T10:41:50", "name": "Sergio"}];
+
+const events = POO_DATA.map(e => ({
+  ...e,
+  date: new Date(e.ts),
+  ds: e.ts.substring(0, 10)
+}));
+
+// ─── PALETTE & NAMES ────────────────────────────────────────────────────────
+const PALETTE = [
+  '#ff6b35','#4ecdc4','#ffe66d','#a8e6cf',
+  '#ff8b94','#b8b8ff','#ffd93d','#6bcb77',
+  '#4d96ff','#c77dff','#ff9f1c','#e76f51'
+];
+const HEADSTARTS = {
+  'Raúl': 128, 'Maldo': 45, 'Jesús': 44,
+  'Sendra': 31, 'Pablo': 24, 'Sergio': 25
+};
+const nameCounts = {};
+events.forEach(e => nameCounts[e.name] = (nameCounts[e.name]||0)+1);
+Object.keys(HEADSTARTS).forEach(n => { if(nameCounts[n]) nameCounts[n] += HEADSTARTS[n]; });
+const NAMES = Object.keys(nameCounts).sort((a,b)=>nameCounts[b]-nameCounts[a]);
+const COLORS = {};
+NAMES.forEach((n,i) => COLORS[n] = PALETTE[i % PALETTE.length]);
+
+// Date range
+const minTs = Math.min(...events.map(e=>e.date));
+const maxTs = Math.max(...events.map(e=>e.date));
+const minDate = new Date(minTs); minDate.setHours(0,0,0,0);
+const maxDate = new Date(maxTs); maxDate.setHours(23,59,59,999);
+
+// All dates in range
+const ALL_DATES = [];
+{ let d = new Date(minDate);
+  while (d <= maxDate) { ALL_DATES.push(d.toISOString().substring(0,10)); d.setDate(d.getDate()+1); }
+}
+
+// ─── ANALYTICS ──────────────────────────────────────────────────────────────
+function eventsFor(name) { return name ? events.filter(e=>e.name===name) : events; }
+
+function dailyCounts(name=null) {
+  const c={};
+  eventsFor(name).forEach(e=>{ c[e.ds]=(c[e.ds]||0)+1; });
+  return c;
+}
+
+function hourlyDist(name=null) {
+  const h=new Array(24).fill(0);
+  eventsFor(name).forEach(e=>h[e.date.getHours()]++);
+  return h;
+}
+
+function dowDist(name=null) {
+  const d=new Array(7).fill(0);
+  eventsFor(name).forEach(e=>d[e.date.getDay()]++);
+  return d;
+}
+
+function streaks(name) {
+  const days=[...new Set(eventsFor(name).map(e=>e.ds))].sort();
+  if (!days.length) return {longest:0,current:0};
+  let longest=1, cur=1, curStart=days[0];
+  for (let i=1;i<days.length;i++){
+    const diff=(new Date(days[i])-new Date(days[i-1]))/86400000;
+    if(diff===1){ cur++; if(cur>longest) longest=cur; }
+    else { cur=1; curStart=days[i]; }
+  }
+  const last=new Date(days[days.length-1]);
+  const today=new Date(); today.setHours(0,0,0,0);
+  const gap=Math.floor((today-last)/86400000);
+  return {longest, current: gap<=1 ? cur : 0};
+}
+
+function cumulSeries(name) {
+  const dc=dailyCounts(name);
+  let c=HEADSTARTS[name]||0;
+  return ALL_DATES.map(ds=>{ c+=(dc[ds]||0); return c; });
+}
+
+// ─── CHART.JS DEFAULTS ──────────────────────────────────────────────────────
+Chart.defaults.color='#666';
+Chart.defaults.borderColor='#2a2a2a';
+Chart.defaults.font.family='-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif';
+Chart.defaults.font.size=11;
+
+const DARK_TOOLTIP = { backgroundColor:'#1e1e1e', borderColor:'#3a3a3a', borderWidth:1, titleColor:'#ccc', bodyColor:'#ccc' };
+
+// destroy helper
+const _charts = {};
+function mkChart(id, config) {
+  if (_charts[id]) { _charts[id].destroy(); }
+  _charts[id] = new Chart(document.getElementById(id), config);
+  return _charts[id];
+}
+
+// ─── KPI CARDS ──────────────────────────────────────────────────────────────
+function renderKPIs() {
+  const total = events.length;
+  const leader = NAMES[0];
+  const lc = nameCounts[leader];
+
+  const hh = hourlyDist();
+  const peakH = hh.indexOf(Math.max(...hh));
+  const peakHStr = `${peakH}:00`;
+
+  const allSt = NAMES.map(n=>({n,...streaks(n)}));
+  const topSt = allSt.reduce((a,b)=>a.longest>b.longest?a:b);
+
+  const dc = dailyCounts();
+  const dvals = Object.values(dc);
+  const maxDayVal = Math.max(...dvals);
+  const bestDateStr = Object.keys(dc).find(d=>dc[d]===maxDayVal)||'';
+
+  const totalDays = ALL_DATES.length;
+  const avgDay = (total/totalDays).toFixed(1);
+
+  let bestPerson = {name:'',count:0};
+  NAMES.forEach(n=>{
+    const m=Math.max(...Object.values(dailyCounts(n)));
+    if(m>bestPerson.count) bestPerson={name:n,count:m};
+  });
+
+  const activeDays = Object.keys(dc).length;
+  const totalPooers = NAMES.length;
+
+  const kpis=[
+    {icon:'💩',val:total.toLocaleString(),lbl:'Total Poos',sub:`${totalPooers} athletes`},
+    {icon:'🥇',val:leader,lbl:'Leader',sub:`${lc} poos`},
+    {icon:'⏰',val:peakHStr,lbl:'Happy Hour',sub:`${hh[peakH]} poos`},
+    {icon:'🔥',val:`${topSt.longest}d`,lbl:'Top Streak',sub:topSt.n},
+    {icon:'📈',val:avgDay,lbl:'Avg / Day',sub:'group total'},
+    {icon:'📅',val:bestDateStr.substring(5)||'—',lbl:'Best Day',sub:`${maxDayVal} poos`},
+    {icon:'✅',val:activeDays,lbl:'Active Days',sub:`of ${totalDays}`},
+    {icon:'⚡',val:`${bestPerson.count}`,lbl:'Max in 1 Day',sub:bestPerson.name},
+  ];
+
+  document.getElementById('kpi-grid').innerHTML = kpis.map(k=>`
+    <div class="kpi-card">
+      <div class="kpi-icon">${k.icon}</div>
+      <div class="kpi-value">${k.val}</div>
+      <div class="kpi-label">${k.lbl}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`).join('');
+}
+
+// ─── LEADERBOARD ────────────────────────────────────────────────────────────
+function renderLeaderboard() {
+  const max = nameCounts[NAMES[0]];
+  const rankClass = ['r1','r2','r3'];
+  document.getElementById('lb').innerHTML = `
+    <table class="lb-table">
+      <thead><tr><th>#</th><th>Athlete</th><th>Total</th><th>Avg/d</th><th>Best</th></tr></thead>
+      <tbody>${NAMES.map((n,i)=>{
+        const cnt=nameCounts[n], pct=((cnt/max)*100).toFixed(0);
+        const dc=dailyCounts(n), ad=Object.keys(dc).length;
+        const best=Math.max(...Object.values(dc));
+        const rc=rankClass[i]||'rn', c=COLORS[n];
+        return `<tr>
+          <td><span class="rank-badge ${rc}">${i+1}</span></td>
+          <td>
+            <span class="dot" style="background:${c}"></span><strong>${n}</strong>
+            <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div>
+          </td>
+          <td style="font-weight:700;color:${c}">${cnt}</td>
+          <td style="color:var(--muted)">${(cnt/ad).toFixed(1)}</td>
+          <td style="color:var(--muted)">${best}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+}
+
+// ─── CUMULATIVE CHART ────────────────────────────────────────────────────────
+function renderCumulative(canvasId, focusName=null) {
+  const tickLabels = ALL_DATES.filter((_,i)=>i%7===0||i===ALL_DATES.length-1)
+    .map(d=>d.substring(5));
+  const tickIdxs = ALL_DATES.reduce((acc,d,i)=>{ if(i%7===0||i===ALL_DATES.length-1) acc.push(i); return acc; },[]);
+
+  const names = focusName ? [focusName] : NAMES;
+  const datasets = names.map(n=>({
+    label: n,
+    data: cumulSeries(n),
+    borderColor: COLORS[n],
+    backgroundColor: focusName ? COLORS[n]+'25' : 'transparent',
+    fill: !!focusName,
+    borderWidth: focusName ? 2.5 : 1.8,
+    pointRadius: 0,
+    tension: 0.3,
+  }));
+
+  if (focusName) {
+    // add group avg
+    const avgSeries = ALL_DATES.map((_,di)=>{
+      const sum = NAMES.reduce((s,n)=>s+cumulSeries(n)[di],0);
+      return +(sum/NAMES.length).toFixed(1);
+    });
+    datasets.push({
+      label:'Group Avg',
+      data: avgSeries,
+      borderColor:'#444',
+      backgroundColor:'transparent',
+      borderWidth:1.5,
+      borderDash:[5,4],
+      pointRadius:0,
+      tension:0.3,
+    });
+  }
+
+  mkChart(canvasId,{
+    type:'line',
+    data:{
+      labels: ALL_DATES,
+      datasets
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      animation:false,
+      plugins:{
+        legend:{
+          display:true, position:'top',
+          labels:{boxWidth:10,padding:8,font:{size:10}}
+        },
+        tooltip:{...DARK_TOOLTIP, mode:'index', intersect:false}
+      },
+      scales:{
+        x:{
+          ticks:{
+            maxTicksLimit:10,
+            callback:(_,i)=>{
+              if(i%7===0) return ALL_DATES[i]?ALL_DATES[i].substring(5):'';
+              return '';
+            },
+            font:{size:10}
+          },
+          grid:{color:'#1e1e1e'}
+        },
+        y:{grid:{color:'#1e1e1e'}, beginAtZero:true}
+      }
+    }
+  });
+}
+
+// ─── HEATMAP ─────────────────────────────────────────────────────────────────
+function renderHeatmap(containerId, name=null) {
+  const dc = dailyCounts(name);
+  const maxVal = Math.max(...Object.values(dc),1);
+  const tooltip = document.getElementById('tooltip');
+
+  // start from Monday of the first week
+  const s = new Date(minDate);
+  const dow0 = (s.getDay()+6)%7; // Mon=0
+  s.setDate(s.getDate()-dow0);
+
+  const weeks=[], CELL=13, GAP=2, PL=26, PT=22;
+  let week=[], d=new Date(s);
+  while (d<=maxDate) {
+    if(week.length===7){weeks.push(week);week=[];}
+    const ds=d.toISOString().substring(0,10);
+    week.push({ds, cnt:dc[ds]||0, active:d>=minDate&&d<=maxDate});
+    d.setDate(d.getDate()+1);
+  }
+  while(week.length<7) week.push({ds:'',cnt:0,active:false});
+  weeks.push(week);
+
+  const W=PL+weeks.length*(CELL+GAP)+60, H=PT+7*(CELL+GAP)+24;
+
+  function col(cnt,active){
+    if(!active||cnt===0) return '#1a1a1a';
+    const t=Math.min(cnt/maxVal,1);
+    return `rgb(${Math.round(20+t*10)},${Math.round(60+t*140)},${Math.round(20+t*10)})`;
+  }
+
+  let svg=`<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" style="display:block">`;
+  ['M','T','W','T','F','S','S'].forEach((l,i)=>{
+    if(i%2===0) svg+=`<text x="${PL-4}" y="${PT+i*(CELL+GAP)+CELL-1}" text-anchor="end" font-size="9" fill="#555">${l}</text>`;
+  });
+
+  let lastMon='';
+  weeks.forEach((wk,wi)=>{
+    const x=PL+wi*(CELL+GAP);
+    const first=wk.find(c=>c.active&&c.ds);
+    if(first){
+      const mo=new Date(first.ds).toLocaleString('en-US',{month:'short'});
+      if(mo!==lastMon){ svg+=`<text x="${x}" y="${PT-6}" font-size="9" fill="#555">${mo}</text>`; lastMon=mo; }
+    }
+    wk.forEach((cell,di)=>{
+      const y=PT+di*(CELL+GAP);
+      svg+=`<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${col(cell.cnt,cell.active)}" data-ds="${cell.ds}" data-cnt="${cell.cnt}" data-a="${cell.active}" style="cursor:${cell.active?'pointer':'default'}"/>`;
+    });
+  });
+
+  // legend
+  const lx=W-60, ly=H-13;
+  svg+=`<text x="${lx-2}" y="${ly+CELL-1}" font-size="9" fill="#555" text-anchor="end">Less</text>`;
+  [0,.25,.5,.75,1].forEach((v,i)=>
+    svg+=`<rect x="${lx+i*(CELL+1)}" y="${ly}" width="${CELL}" height="${CELL}" rx="2" fill="${col(v*maxVal,true)}"/>`
+  );
+  svg+=`<text x="${lx+5*(CELL+1)+2}" y="${ly+CELL-1}" font-size="9" fill="#555">More</text>`;
+  svg+=`</svg>`;
+
+  const el=document.getElementById(containerId);
+  el.innerHTML=svg;
+
+  el.querySelectorAll('rect[data-a="true"]').forEach(r=>{
+    r.addEventListener('mouseenter',()=>{
+      tooltip.style.display='block';
+      tooltip.innerHTML=`<strong>${r.dataset.ds}</strong><br>${r.dataset.cnt} poo${r.dataset.cnt!='1'?'s':''}`;
+    });
+    r.addEventListener('mousemove',e=>{
+      tooltip.style.left=(e.clientX+14)+'px';
+      tooltip.style.top=(e.clientY-30)+'px';
+    });
+    r.addEventListener('mouseleave',()=>tooltip.style.display='none');
+  });
+}
+
+// ─── HAPPY HOUR ──────────────────────────────────────────────────────────────
+function renderHH(canvasId, name=null) {
+  const h=hourlyDist(name), mx=Math.max(...h);
+  const color = name ? COLORS[name] : '#ff6b35';
+  mkChart(canvasId,{
+    type:'bar',
+    data:{
+      labels:Array.from({length:24},(_,i)=>{
+        if(i===0)return'12am'; if(i===12)return'12pm';
+        if(i%3!==0)return'';
+        return i<12?`${i}am`:`${i-12}pm`;
+      }),
+      datasets:[{
+        data:h,
+        backgroundColor:h.map(v=>v===mx?color:color+'35'),
+        borderRadius:3, borderSkipped:false
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{legend:{display:false},tooltip:{...DARK_TOOLTIP}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:9}}},
+        y:{grid:{color:'#1e1e1e'},beginAtZero:true,ticks:{font:{size:10}}}
+      }
+    }
+  });
+}
+
+// ─── DAY OF WEEK ─────────────────────────────────────────────────────────────
+function renderDOW(canvasId, name=null) {
+  const raw=dowDist(name);
+  const d=[raw[1],raw[2],raw[3],raw[4],raw[5],raw[6],raw[0]]; // Mon first
+  const mx=Math.max(...d);
+  const color = name ? COLORS[name] : '#4ecdc4';
+  mkChart(canvasId,{
+    type:'bar',
+    data:{
+      labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets:[{
+        data:d,
+        backgroundColor:d.map(v=>v===mx?color:color+'35'),
+        borderRadius:3
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{legend:{display:false},tooltip:{...DARK_TOOLTIP}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10}}},
+        y:{grid:{color:'#1e1e1e'},beginAtZero:true}
+      }
+    }
+  });
+}
+
+// ─── STREAKS CHART ───────────────────────────────────────────────────────────
+function renderStreaks() {
+  const data = NAMES.map(n=>({n,...streaks(n)})).sort((a,b)=>b.longest-a.longest);
+  mkChart('c-streaks',{
+    type:'bar',
+    data:{
+      labels:data.map(d=>d.n),
+      datasets:[
+        {
+          label:'Longest',
+          data:data.map(d=>d.longest),
+          backgroundColor:data.map(d=>COLORS[d.n]+'90'),
+          borderRadius:3
+        },
+        {
+          label:'Current',
+          data:data.map(d=>d.current),
+          backgroundColor:data.map(d=>COLORS[d.n]),
+          borderRadius:3
+        }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{
+        legend:{display:true,labels:{boxWidth:10,padding:8,font:{size:10}}},
+        tooltip:{...DARK_TOOLTIP}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10}}},
+        y:{grid:{color:'#1e1e1e'},beginAtZero:true,title:{display:true,text:'Days',font:{size:10},color:'#555'}}
+      }
+    }
+  });
+}
+
+// ─── DAILY CHART ─────────────────────────────────────────────────────────────
+function renderDaily() {
+  const dc=dailyCounts();
+  const dates=Object.keys(dc).sort();
+  mkChart('c-daily',{
+    type:'bar',
+    data:{
+      labels:dates.map(d=>d.substring(5)),
+      datasets:[{
+        data:dates.map(d=>dc[d]),
+        backgroundColor:'#ff6b3555',
+        borderColor:'#ff6b3599',
+        borderWidth:1,
+        borderRadius:2
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{legend:{display:false},tooltip:{...DARK_TOOLTIP}},
+      scales:{
+        x:{grid:{display:false},ticks:{maxTicksLimit:14,font:{size:9}}},
+        y:{grid:{color:'#1e1e1e'},beginAtZero:true}
+      }
+    }
+  });
+}
+
+// ─── PROFILE TAB ─────────────────────────────────────────────────────────────
+function renderProfileTabs() {
+  document.getElementById('ptabs-row').innerHTML = NAMES.map((n,i)=>`
+    <button class="ptab" id="ptab-${i}" onclick="selectProfile('${n}',${i})"
+      style="border-color:${COLORS[n]};color:${COLORS[n]};background:${COLORS[n]}15">
+      ${n}
+    </button>`).join('');
+}
+
+let _activeProfile = null;
+function selectProfile(name, idx) {
+  _activeProfile = name;
+  const dc=dailyCounts(name);
+  const ad=Object.keys(dc).length;
+  const best=Math.max(...Object.values(dc),0);
+  const st=streaks(name);
+  const rank=NAMES.indexOf(name)+1;
+  const color=COLORS[name];
+  const hh=hourlyDist(name), peakH=hh.indexOf(Math.max(...hh));
+  const dow=dowDist(name);
+  const dowLbls=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const peakDow=dowLbls[dow.indexOf(Math.max(...dow))];
+
+  document.getElementById('profile-content').innerHTML = `
+    <div class="profile-banner" style="border-color:${color}30">
+      <div class="p-avatar" style="background:${color}20;border:2px solid ${color}">💩</div>
+      <div>
+        <div class="p-name" style="color:${color}">${name}</div>
+        <div class="p-rank">Rank #${rank} of ${NAMES.length} &nbsp;·&nbsp; Peak hour: ${peakH}:00 &nbsp;·&nbsp; Best day: ${peakDow}</div>
+      </div>
+      <div class="p-stats">
+        ${[
+          [nameCounts[name],'Total'],
+          [st.longest+'d','Best Streak'],
+          [st.current+'d','Cur. Streak'],
+          [ad,'Active Days'],
+          [best,'Best Day'],
+          [((nameCounts[name]/ad)||0).toFixed(1),'Avg / Day']
+        ].map(([v,l])=>`<div class="p-stat"><div class="p-stat-val" style="color:${color}">${v}</div><div class="p-stat-lbl">${l}</div></div>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">📈 Progression vs Group Average</div>
+      <div class="ch" style="height:240px"><canvas id="p-c-cumul"></canvas></div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">📅 Activity Calendar</div>
+      <div class="hm-scroll"><div id="p-hm"></div></div>
+    </div>
+    <div class="row c2">
+      <div class="card">
+        <div class="card-title">⏰ Happy Hour</div>
+        <div class="ch" style="height:190px"><canvas id="p-c-hh"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📆 Day of Week</div>
+        <div class="ch" style="height:190px"><canvas id="p-c-dow"></canvas></div>
+      </div>
+    </div>`;
+
+  renderCumulative('p-c-cumul', name);
+  renderHeatmap('p-hm', name);
+  renderHH('p-c-hh', name);
+  renderDOW('p-c-dow', name);
+}
+
+// ─── TAB SWITCH ──────────────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ─── MEDALS ──────────────────────────────────────────────────────────────────
+function maxInWindow(name, ms) {
+  const ts = eventsFor(name).map(e => e.date.getTime()).sort((a,b)=>a-b);
+  let max = 0;
+  for (let i = 0; i < ts.length; i++) {
+    let cnt = 1;
+    for (let j = i+1; j < ts.length && ts[j]-ts[i] <= ms; j++) cnt++;
+    if (cnt > max) max = cnt;
+  }
+  return max;
+}
+
+function bestInWindow(hours) {
+  let best = {name:'', count:0};
+  NAMES.forEach(n => {
+    const c = maxInWindow(n, hours*3600000);
+    if (c > best.count) best = {name:n, count:c};
+  });
+  return best;
+}
+
+// Day boundary at 6am: anything before 6am belongs to previous day
+function pooDayKey(date) {
+  const d = new Date(date);
+  if (d.getHours() < 6) d.setDate(d.getDate()-1);
+  return d.toISOString().substring(0,10);
+}
+
+function earlyLateStats() {
+  const byDay = {};
+  events.forEach(e => {
+    const key = pooDayKey(e.date);
+    if (!byDay[key]) byDay[key] = [];
+    byDay[key].push(e);
+  });
+  const firstCounts = {}, lastCounts = {};
+  Object.values(byDay).forEach(dayEvts => {
+    dayEvts.sort((a,b) => a.date-b.date);
+    const first = dayEvts[0].name;
+    const last  = dayEvts[dayEvts.length-1].name;
+    firstCounts[first] = (firstCounts[first]||0)+1;
+    lastCounts[last]   = (lastCounts[last]||0)+1;
+  });
+  const earlyBird = NAMES.reduce((b,n)=>(firstCounts[n]||0)>(firstCounts[b]||0)?n:b, NAMES[0]);
+  const nightOwl  = NAMES.reduce((b,n)=>(lastCounts[n]||0)>(lastCounts[b]||0)?n:b, NAMES[0]);
+  return {
+    earlyBird: {name:earlyBird, count:firstCounts[earlyBird]||0},
+    nightOwl:  {name:nightOwl,  count:lastCounts[nightOwl]||0},
+  };
+}
+
+function fmtHour(h) {
+  const hh = Math.floor(h), mm = Math.round((h-hh)*60);
+  const ampm = hh < 12 ? 'am' : 'pm';
+  return `${hh%12||12}:${String(mm).padStart(2,'0')}${ampm}`;
+}
+
+function dailyStdDev(name) {
+  // Std dev of poos-per-day, only days with data
+  const vals = Object.values(dailyCounts(name));
+  if (vals.length < 2) return 0;
+  const mean = vals.reduce((a,b)=>a+b,0)/vals.length;
+  return Math.sqrt(vals.reduce((a,b)=>a+(b-mean)**2,0)/vals.length);
+}
+
+function renderMedals() {
+  const w1 = bestInWindow(1), w2 = bestInWindow(2), w3 = bestInWindow(3);
+
+  const {earlyBird, nightOwl} = earlyLateStats();
+  const variable = NAMES.reduce((b,n)=>{ const v=dailyStdDev(n); return v>b.v?{name:n,v}:b; },{name:'',v:-Infinity});
+
+  const medals = [
+    { icon:'⚡', title:'Corta-Heces', name:w1.name, stat:`${w1.count} poos in 1 hour`, color:'#ff6b35' },
+    { icon:'🚀', title:'2h Blitz',    name:w2.name, stat:`${w2.count} poos in 2 hours`, color:'#4ecdc4' },
+    { icon:'💪', title:'3h Beast',    name:w3.name, stat:`${w3.count} poos in 3 hours`, color:'#ffe66d' },
+    { icon:'🌅', title:'Early Bird',  name:earlyBird.name, stat:`First of the day ${earlyBird.count}×`, color:'#a8e6cf' },
+    { icon:'🌙', title:'Night Owl',   name:nightOwl.name,  stat:`Last of the day ${nightOwl.count}×`, color:'#b8b8ff' },
+    { icon:'🎲', title:'Wild Card',   name:variable.name,  stat:`±${variable.v.toFixed(1)} poos/day`, color:'#ff8b94' },
+  ];
+
+  document.getElementById('medals-grid').innerHTML = medals.map(m => `
+    <div class="medal-card" style="border-color:${COLORS[m.name]||'#333'}40">
+      <div class="medal-icon" style="background:${COLORS[m.name]||'#333'}20">${m.icon}</div>
+      <div class="medal-body">
+        <div class="medal-title">${m.title}</div>
+        <div class="medal-winner" style="color:${COLORS[m.name]||'#fff'}">${m.name}</div>
+        <div class="medal-stat">${m.stat}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+(function init(){
+  renderKPIs();
+  renderMedals();
+  renderLeaderboard();
+  renderCumulative('c-cumul');
+  renderHeatmap('hm-group');
+  renderHH('c-hh');
+  renderDOW('c-dow');
+  renderStreaks();
+  renderDaily();
+  renderProfileTabs();
+  if (NAMES.length) selectProfile(NAMES[0], 0);
+})();
+</script>
+</body>
+</html>
