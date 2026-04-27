@@ -780,7 +780,9 @@ function switchTab(tab, btn) {
 
 // ─── MEDALS ──────────────────────────────────────────────────────────────────
 function maxInWindow(name, ms) {
-  const ts = eventsFor(name).map(e => e.date.getTime()).sort((a,b)=>a-b);
+  const ts = eventsFor(name)
+    .filter(e => !(e.name === 'Raúl' && e.ds === '2026-01-25'))
+    .map(e => e.date.getTime()).sort((a,b)=>a-b);
   let max = 0;
   for (let i = 0; i < ts.length; i++) {
     let cnt = 1;
