@@ -193,6 +193,51 @@
     .medal-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
     .medal-winner { font-size: 16px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .medal-stat { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    /* ── Medal Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: #000000bb; z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #1a1a1a; border: 1px solid #333;
+      border-radius: 14px; width: 480px; max-width: 95vw;
+      max-height: 85vh; display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 20px; border-bottom: 1px solid #2a2a2a;
+      flex-shrink: 0;
+    }
+    .modal-header-icon { font-size: 22px; }
+    .modal-header-title { font-size: 15px; font-weight: 700; flex: 1; }
+    .modal-close {
+      background: none; border: none; color: #666;
+      font-size: 20px; cursor: pointer; line-height: 1;
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .modal-close:hover { color: #ccc; background: #2a2a2a; }
+    .modal-body { overflow-y: auto; padding: 16px 20px; }
+    .modal-row {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid #222;
+    }
+    .modal-row:last-child { border-bottom: none; }
+    .modal-rank {
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+    }
+    .modal-name { font-size: 14px; font-weight: 600; }
+    .modal-detail { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .modal-value { margin-left: auto; font-size: 18px; font-weight: 700; flex-shrink: 0; }
+    .times-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+    .time-chip {
+      background: #2a2a2a; border-radius: 4px;
+      padding: 2px 6px; font-size: 11px; color: #aaa;
+    }
     /* ── Tooltip ── */
     #tooltip {
       position: fixed; background: #1e1e1e; border: 1px solid #3a3a3a;
@@ -270,6 +315,17 @@
   </div>
 
 </main>
+
+<div class="modal-overlay" id="medal-modal" onclick="closeMedalModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-header-icon" id="modal-icon"></span>
+      <span class="modal-header-title" id="modal-title"></span>
+      <button class="modal-close" onclick="document.getElementById('medal-modal').classList.remove('open')">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
 
 <script>
 // ─── DATA (loaded via fetch) ───────────────────────────────────────────────
@@ -974,11 +1030,11 @@ function renderMedals() {
     { icon:'🎯', title:'Machine',         name:mach.name,     stat:`CV ${(mach.cv*100).toFixed(0)}% consistency`, info:'Lowest coefficient of variation (std dev / mean) of daily poos — the most clockwork consistent.' },
   ];
 
-  document.getElementById('medals-grid').innerHTML = medals.map(m => {
+  document.getElementById('medals-grid').innerHTML = medals.map((m, idx) => {
     const c = m.color || COLORS[m.name] || '#888';
     return `
-    <div class="medal-card" style="border-color:${c}40">
-      <div class="medal-info">i<span class="medal-info-tip">${m.info}</span></div>
+    <div class="medal-card" style="border-color:${c}40;cursor:pointer" onclick="openMedalModal(${idx})">
+      <div class="medal-info" onclick="event.stopPropagation()">i<span class="medal-info-tip">${m.info}</span></div>
       <div class="medal-icon" style="background:${c}20">${m.icon}</div>
       <div class="medal-body">
         <div class="medal-title">${m.title}</div>
@@ -987,6 +1043,229 @@ function renderMedals() {
       </div>
     </div>`;
   }).join('');
+}
+
+// ─── MEDAL MODAL ─────────────────────────────────────────────────────────────
+
+function bestWindowDetails(name, ms) {
+  const filtered = eventsFor(name)
+    .filter(e => !(e.name === 'Raúl' && e.ds === '2026-01-25'))
+    .sort((a,b) => a.date - b.date);
+  let best = {count:0, date:'', times:[]};
+  for (let i = 0; i < filtered.length; i++) {
+    const t0 = filtered[i].date.getTime();
+    const win = filtered.filter((e,j) => j >= i && e.date.getTime()-t0 <= ms);
+    const span = win.length > 1 ? win[win.length-1].date.getTime() - t0 : 0;
+    if (win.length > best.count || (win.length === best.count && span < best.span)) {
+      best = {
+        count: win.length,
+        span,
+        date: win[0].ds,
+        times: win.map(e => e.ts.substring(11,16)),
+      };
+    }
+  }
+  // Count how many times this max count was achieved
+  let occ = 0;
+  for (let i = 0; i < filtered.length; i++) {
+    const t0 = filtered[i].date.getTime();
+    const win = filtered.filter((e,j) => j >= i && e.date.getTime()-t0 <= ms);
+    if (win.length === best.count) occ++;
+  }
+  best.occurrences = occ;
+  return best;
+}
+
+function rankBadgeHtml(i) {
+  const cls = ['r1','r2','r3'][i] || 'rn';
+  return `<span class="modal-rank ${cls}">${i+1}</span>`;
+}
+
+function getMedalRanking(key) {
+  const top = 5;
+  switch(key) {
+    case '1h': case '2h': case '3h': {
+      const ms = {'1h':3600000,'2h':7200000,'3h':10800000}[key];
+      return NAMES.map(n => ({name:n, ...bestWindowDetails(n, ms)}))
+        .sort((a,b) => b.count-a.count || b.occurrences-a.occurrences || a.span-b.span).slice(0,top)
+        .map((r,i) => `
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div style="flex:1">
+              <div class="modal-name" style="color:${COLORS[r.name]}">${r.name}</div>
+              <div class="modal-detail">${r.date} · happened ${r.occurrences}×</div>
+              <div class="times-list">${r.times.map(t=>`<span class="time-chip">${t}</span>`).join('')}</div>
+            </div>
+            <div class="modal-value" style="color:${COLORS[r.name]}">${r.count}</div>
+          </div>`).join('');
+    }
+    case 'chain': {
+      const triggered={}, total={};
+      events.forEach(e=>{
+        total[e.name]=(total[e.name]||0)+1;
+        const t0=e.date.getTime();
+        if(events.some(e2=>e2.name!==e.name&&e2.date.getTime()>t0&&e2.date.getTime()-t0<=3600000))
+          triggered[e.name]=(triggered[e.name]||0)+1;
+      });
+      return NAMES.filter(n=>(total[n]||0)>=20)
+        .map(n=>({name:n, rate:(triggered[n]||0)/(total[n]||1), count:triggered[n]||0, total:total[n]||0}))
+        .sort((a,b)=>b.rate-a.rate).slice(0,top)
+        .map((r,i)=>`
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div style="flex:1">
+              <div class="modal-name" style="color:${COLORS[r.name]}">${r.name}</div>
+              <div class="modal-detail">${r.count} triggers out of ${r.total} poos</div>
+            </div>
+            <div class="modal-value" style="color:${COLORS[r.name]}">${(r.rate*100).toFixed(0)}%</div>
+          </div>`).join('');
+    }
+    case 'earlybird': case 'nightowl': {
+      const byDay={};
+      events.forEach(e=>{ if(!byDay[e.ds]) byDay[e.ds]=[]; byDay[e.ds].push(e); });
+      const counts={};
+      Object.values(byDay).forEach(d=>{
+        d.sort((a,b)=>a.date-b.date);
+        const pick = key==='earlybird' ? d[0] : d[d.length-1];
+        counts[pick.name]=(counts[pick.name]||0)+1;
+      });
+      return NAMES.map(n=>({name:n,count:counts[n]||0}))
+        .sort((a,b)=>b.count-a.count).slice(0,top)
+        .map((r,i)=>`
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div class="modal-name" style="color:${COLORS[r.name]};flex:1">${r.name}</div>
+            <div class="modal-value" style="color:${COLORS[r.name]}">${r.count}×</div>
+          </div>`).join('');
+    }
+    case 'wildcard': {
+      return NAMES.map(n=>({name:n,v:dailyStdDev(n)}))
+        .sort((a,b)=>b.v-a.v).slice(0,top)
+        .map((r,i)=>`
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div class="modal-name" style="color:${COLORS[r.name]};flex:1">${r.name}</div>
+            <div class="modal-value" style="color:${COLORS[r.name]}">±${r.v.toFixed(2)}</div>
+          </div>`).join('');
+    }
+    case 'lonewolf': {
+      const solo={};
+      events.forEach(e=>{
+        const t0=e.date.getTime();
+        if(!events.some(e2=>e2.name!==e.name&&Math.abs(e2.date.getTime()-t0)<=7200000))
+          solo[e.name]=(solo[e.name]||0)+1;
+      });
+      return NAMES.map(n=>({name:n,count:solo[n]||0}))
+        .sort((a,b)=>b.count-a.count).slice(0,top)
+        .map((r,i)=>`
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div class="modal-name" style="color:${COLORS[r.name]};flex:1">${r.name}</div>
+            <div class="modal-value" style="color:${COLORS[r.name]}">${r.count}</div>
+          </div>`).join('');
+    }
+    case 'weekend': {
+      const we={},wd={};
+      events.forEach(e=>{ const d=e.date.getDay(); (d===0||d===6?we:wd)[e.name]=((d===0||d===6?we:wd)[e.name]||0)+1; });
+      return NAMES.map(n=>({name:n,ratio:((we[n]||0)/2)/((wd[n]||1)/5),we:we[n]||0,wd:wd[n]||0}))
+        .sort((a,b)=>b.ratio-a.ratio).slice(0,top)
+        .map((r,i)=>`
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div style="flex:1">
+              <div class="modal-name" style="color:${COLORS[r.name]}">${r.name}</div>
+              <div class="modal-detail">Weekend: ${r.we} · Weekday: ${r.wd}</div>
+            </div>
+            <div class="modal-value" style="color:${COLORS[r.name]}">${r.ratio.toFixed(2)}×</div>
+          </div>`).join('');
+    }
+    case 'onfire': {
+      const mid=ALL_DATES[Math.floor(ALL_DATES.length/2)];
+      return NAMES.map(n=>{
+        const dc=dailyCounts(n);
+        const f=Object.entries(dc).filter(([d])=>d<mid).map(([,v])=>v);
+        const s=Object.entries(dc).filter(([d])=>d>=mid).map(([,v])=>v);
+        const avg1=f.length?f.reduce((a,v)=>a+v,0)/f.length:0;
+        const avg2=s.length?s.reduce((a,v)=>a+v,0)/s.length:0;
+        return {name:n,growth:avg2-avg1,avg1,avg2};
+      }).sort((a,b)=>b.growth-a.growth).slice(0,top)
+        .map((r,i)=>`
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div style="flex:1">
+              <div class="modal-name" style="color:${COLORS[r.name]}">${r.name}</div>
+              <div class="modal-detail">First half: ${r.avg1.toFixed(2)}/d → Second: ${r.avg2.toFixed(2)}/d</div>
+            </div>
+            <div class="modal-value" style="color:${COLORS[r.name]}">${r.growth>0?'+':''}${r.growth.toFixed(2)}</div>
+          </div>`).join('');
+    }
+    case 'machine': {
+      return NAMES.map(n=>{
+        const vals=Object.values(dailyCounts(n));
+        const mean=vals.reduce((a,v)=>a+v,0)/vals.length;
+        const std=Math.sqrt(vals.reduce((a,v)=>a+(v-mean)**2,0)/vals.length);
+        return {name:n,cv:std/mean,mean};
+      }).filter(r=>isFinite(r.cv))
+        .sort((a,b)=>a.cv-b.cv).slice(0,top)
+        .map((r,i)=>`
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div style="flex:1">
+              <div class="modal-name" style="color:${COLORS[r.name]}">${r.name}</div>
+              <div class="modal-detail">Avg ${r.mean.toFixed(2)} poos/active day</div>
+            </div>
+            <div class="modal-value" style="color:${COLORS[r.name]}">${(r.cv*100).toFixed(0)}%</div>
+          </div>`).join('');
+    }
+    case 'partners': {
+      const byDay={};
+      events.forEach(e=>{ if(!byDay[e.ds]) byDay[e.ds]=[]; byDay[e.ds].push(e); });
+      const pairClosest={};
+      Object.values(byDay).forEach(dayEvts=>{
+        const byP={};
+        dayEvts.forEach(e=>{ if(!byP[e.name]) byP[e.name]=[]; byP[e.name].push(e.date.getTime()); });
+        const pp=Object.keys(byP);
+        for(let i=0;i<pp.length;i++) for(let j=i+1;j<pp.length;j++){
+          const key=[pp[i],pp[j]].sort().join('||');
+          let min=Infinity;
+          byP[pp[i]].forEach(ta=>byP[pp[j]].forEach(tb=>{ const g=Math.abs(ta-tb)/60000; if(g<min) min=g; }));
+          if(!pairClosest[key]) pairClosest[key]=[];
+          pairClosest[key].push(min);
+        }
+      });
+      return Object.entries(pairClosest)
+        .filter(([,g])=>g.length>=10)
+        .map(([key,gaps])=>{ const [n1,n2]=key.split('||'); return {n1,n2,avg:gaps.reduce((a,b)=>a+b,0)/gaps.length,days:gaps.length}; })
+        .sort((a,b)=>a.avg-b.avg).slice(0,top)
+        .map((r,i)=>`
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div style="flex:1">
+              <div class="modal-name"><span style="color:${COLORS[r.n1]}">${r.n1}</span> & <span style="color:${COLORS[r.n2]}">${r.n2}</span></div>
+              <div class="modal-detail">${r.days} shared days</div>
+            </div>
+            <div class="modal-value" style="color:#aaa">${Math.round(r.avg)}min</div>
+          </div>`).join('');
+    }
+    default: return '<div class="modal-detail">No ranking available.</div>';
+  }
+}
+
+const MEDAL_KEYS = ['1h','2h','3h','earlybird','nightowl','wildcard','partners','chain','lonewolf','weekend','onfire','machine'];
+
+function openMedalModal(idx) {
+  const medals = document.querySelectorAll('.medal-card');
+  const card = medals[idx];
+  const key = MEDAL_KEYS[idx];
+  document.getElementById('modal-icon').textContent  = card.querySelector('.medal-icon').textContent;
+  document.getElementById('modal-title').textContent = card.querySelector('.medal-title').textContent;
+  document.getElementById('modal-body').innerHTML    = getMedalRanking(key);
+  document.getElementById('medal-modal').classList.add('open');
+}
+
+function closeMedalModal(e) {
+  if (e.target === document.getElementById('medal-modal'))
+    document.getElementById('medal-modal').classList.remove('open');
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
