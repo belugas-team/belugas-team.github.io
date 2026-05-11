@@ -283,6 +283,14 @@
       </div>
     </div>
     <div class="card" style="margin-bottom:12px">
+      <div class="card-title">📊 Poos per Week</div>
+      <div class="ch" style="height:290px"><canvas id="c-weekly"></canvas></div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">🏅 Weekly League</div>
+      <div id="wl"></div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
       <div class="card-title">📅 Activity Calendar — Group</div>
       <div class="hm-scroll"><div id="hm-group"></div></div>
     </div>
@@ -340,8 +348,8 @@ const PALETTE = [
   '#4d96ff','#c77dff','#ff9f1c','#e76f51'
 ];
 const HEADSTARTS = {
-  'Raúl': 45, 'Maldo': 45, 'Jesús': 44,
-  'Sendra': 31, 'Pablo': 24, 'Sergio': 25
+  'Raúl': 45, 'Maldo': 44, 'Jesús': 45,
+  'Sendra': 28, 'Pablo': 21, 'Sergio': 25
 };
 const nameCounts = {};
 const NAMES = [];
@@ -497,6 +505,82 @@ function renderLeaderboard() {
     </table>`;
 }
 
+// ─── WEEKLY LEAGUE ───────────────────────────────────────────────────────────
+function ymdLocal(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+function weekKey(date) {
+  const d = new Date(date);
+  d.setHours(0,0,0,0);
+  const day = d.getDay() || 7; // Mon=1..Sun=7
+  d.setDate(d.getDate() - (day - 1));
+  return ymdLocal(d);
+}
+
+const WEEK_START = '2026-01-19'; // first full Mon–Sun week
+function weeklyLeague() {
+  const POINTS = [5,4,3,2,1];
+  const byWeek = {};
+  events.forEach(e => {
+    const wk = weekKey(e.date);
+    if (wk < WEEK_START) return;
+    if (!byWeek[wk]) byWeek[wk] = {};
+    byWeek[wk][e.name] = (byWeek[wk][e.name]||0) + 1;
+  });
+  const points = {}, wins = {}, weeksPlayed = Object.keys(byWeek).length;
+  Object.values(byWeek).forEach(counts => {
+    const ranked = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+    let i = 0;
+    while (i < ranked.length) {
+      let j = i;
+      while (j < ranked.length && ranked[j][1] === ranked[i][1]) j++;
+      // tied group: positions [i..j-1]
+      let sum = 0;
+      for (let k = i; k < j && k < POINTS.length; k++) sum += POINTS[k];
+      const shared = sum / (j - i);
+      for (let k = i; k < j; k++) {
+        const name = ranked[k][0];
+        points[name] = (points[name]||0) + shared;
+        if (i === 0) wins[name] = (wins[name]||0) + 1;
+      }
+      i = j;
+    }
+  });
+  const ranking = NAMES.map(n => ({
+    name: n,
+    points: points[n] || 0,
+    wins: wins[n] || 0,
+  })).sort((a,b) => b.points-a.points || b.wins-a.wins);
+  return { ranking, weeksPlayed };
+}
+
+function renderWeeklyLeague() {
+  const { ranking, weeksPlayed } = weeklyLeague();
+  const max = ranking[0]?.points || 1;
+  const rankClass = ['r1','r2','r3'];
+  document.getElementById('wl').innerHTML = `
+    <table class="lb-table">
+      <thead><tr><th>#</th><th>Athlete</th><th>Points</th><th>Wins</th><th>Avg/wk</th></tr></thead>
+      <tbody>${ranking.map((r,i)=>{
+        const pct=((r.points/max)*100).toFixed(0);
+        const rc=rankClass[i]||'rn', c=COLORS[r.name];
+        return `<tr>
+          <td><span class="rank-badge ${rc}">${i+1}</span></td>
+          <td>
+            <span class="dot" style="background:${c}"></span><strong>${r.name}</strong>
+            <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div>
+          </td>
+          <td style="font-weight:700;color:${c}">${r.points.toFixed(1).replace(/\.0$/,'')}</td>
+          <td style="color:var(--muted)">${r.wins}</td>
+          <td style="color:var(--muted)">${(r.points/weeksPlayed).toFixed(2)}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+}
+
 // ─── CUMULATIVE CHART ────────────────────────────────────────────────────────
 function renderCumulative(canvasId, focusName=null) {
   const tickLabels = ALL_DATES.filter((_,i)=>i%7===0||i===ALL_DATES.length-1)
@@ -562,6 +646,72 @@ function renderCumulative(canvasId, focusName=null) {
           grid:{color:'#1e1e1e'}
         },
         y:{grid:{color:'#1e1e1e'}, beginAtZero:true}
+      }
+    }
+  });
+}
+
+// ─── WEEKLY POOS CHART ───────────────────────────────────────────────────────
+function renderWeeklyChart(canvasId, focusName=null) {
+  // Build sorted week keys (Mondays) from WEEK_START → maxDate
+  const weeks = [];
+  const [yy,mm,dd] = WEEK_START.split('-').map(Number);
+  const start = new Date(yy, mm-1, dd);
+  for (let d = new Date(start); d <= maxDate; d.setDate(d.getDate()+7)) {
+    weeks.push(ymdLocal(d));
+  }
+
+  // count poos per person per week
+  const counts = {}; // name -> {weekKey: count}
+  events.forEach(e => {
+    const wk = weekKey(e.date);
+    if (!counts[e.name]) counts[e.name] = {};
+    counts[e.name][wk] = (counts[e.name][wk]||0) + 1;
+  });
+
+  const names = focusName ? [focusName] : NAMES;
+  const datasets = names.map(n=>({
+    label: n,
+    data: weeks.map(wk => counts[n]?.[wk] || 0),
+    borderColor: COLORS[n],
+    backgroundColor: focusName ? COLORS[n]+'25' : 'transparent',
+    fill: !!focusName,
+    borderWidth: focusName ? 2.5 : 1.8,
+    pointRadius: 3,
+    pointHoverRadius: 5,
+    tension: 0.3,
+  }));
+
+  if (focusName) {
+    const avgSeries = weeks.map(wk => {
+      const sum = NAMES.reduce((s,n)=>s+(counts[n]?.[wk]||0),0);
+      return +(sum/NAMES.length).toFixed(1);
+    });
+    datasets.push({
+      label:'Group Avg',
+      data: avgSeries,
+      borderColor:'#444',
+      backgroundColor:'transparent',
+      borderWidth:1.5,
+      borderDash:[5,4],
+      pointRadius:0,
+      tension:0.3,
+    });
+  }
+
+  mkChart(canvasId,{
+    type:'line',
+    data:{ labels: weeks.map(w=>w.substring(5)), datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      animation:false,
+      plugins:{
+        legend:{display:true, position:'top', labels:{boxWidth:10,padding:8,font:{size:10}}},
+        tooltip:{...DARK_TOOLTIP, mode:'index', intersect:false}
+      },
+      scales:{
+        x:{ ticks:{font:{size:10}}, grid:{color:'#1e1e1e'} },
+        y:{ grid:{color:'#1e1e1e'}, beginAtZero:true, ticks:{precision:0} }
       }
     }
   });
@@ -1286,7 +1436,9 @@ fetch('poo_events.json')
     renderKPIs();
     renderMedals();
     renderLeaderboard();
+    renderWeeklyLeague();
     renderCumulative('c-cumul');
+    renderWeeklyChart('c-weekly');
     renderHeatmap('hm-group');
     renderHH('c-hh');
     renderDOW('c-dow');
