@@ -1151,6 +1151,39 @@ function machine() {
   return best;
 }
 
+// Distinct hours-of-day (0–23) a person has pooped in at least once.
+function hourCoverage(name) {
+  const hrs = new Set();
+  eventsFor(name).forEach(e => hrs.add(e.date.getHours()));
+  return hrs.size;
+}
+
+// Longest single stretch between two consecutive poos.
+function longestGap(name) {
+  const ts = eventsFor(name).map(e => e.date.getTime()).sort((a,b)=>a-b);
+  let best = {ms:0, from:null, to:null};
+  for (let i=1;i<ts.length;i++){
+    const g = ts[i]-ts[i-1];
+    if (g > best.ms) best = {ms:g, from:ts[i-1], to:ts[i]};
+  }
+  return best;
+}
+
+function fmtDuration(ms) {
+  const totalMin = Math.round(ms/60000);
+  const d = Math.floor(totalMin/1440);
+  const h = Math.floor((totalMin%1440)/60);
+  const m = totalMin%60;
+  if (d>0) return `${d}d ${h}h`;
+  if (h>0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function fmtDateTime(ms) {
+  return new Date(ms).toLocaleString('en-US',
+    {month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false});
+}
+
 function renderMedals() {
   const w1 = bestInWindow(1), w2 = bestInWindow(2), w3 = bestInWindow(3);
   const {earlyBird, nightOwl} = earlyLateStats();
@@ -1161,6 +1194,8 @@ function renderMedals() {
   const warrior   = weekendWarrior();
   const fire      = onFire();
   const mach      = machine();
+  const hourCov   = NAMES.reduce((b,n)=>{ const c=hourCoverage(n); return c>b.count?{name:n,count:c}:b; },{name:'',count:0});
+  const consti    = NAMES.reduce((b,n)=>{ const g=longestGap(n); return g.ms>b.ms?{name:n,...g}:b; },{name:'',ms:0});
 
   const partnerColor = partners.n1 ? COLORS[partners.n1] : '#fff';
   const partnerName  = partners.n1 ? `${partners.n1} & ${partners.n2}` : '—';
@@ -1178,6 +1213,8 @@ function renderMedals() {
     { icon:'🏄', title:'Weekend Warrior', name:warrior.name,  stat:`${warrior.ratio.toFixed(2)}× weekend rate`,   info:'Highest ratio of poos per weekend day vs poos per weekday (normalized for 2 vs 5 days).' },
     { icon:'📈', title:'On Fire',         name:fire.name,     stat:`+${fire.growth.toFixed(2)} poos/day`,         info:'Biggest improvement: avg daily poos in the second half of the season vs the first half.' },
     { icon:'🎯', title:'Machine',         name:mach.name,     stat:`CV ${(mach.cv*100).toFixed(0)}% consistency`, info:'Lowest coefficient of variation (std dev / mean) of daily poos — the most clockwork consistent.' },
+    { icon:'🕰️', title:'Reloj 24h',      name:hourCov.name,  stat:`${hourCov.count}/24 hours hit`,               info:'Most distinct hours of the day (0–23) this person has pooped in at least once. A full clock is 24.' },
+    { icon:'🧱', title:'Estreñido',      name:consti.name,   stat:`${fmtDuration(consti.ms)} dry`,               info:'Longest single stretch between two consecutive poos — the most epic hold of the season.' },
   ];
 
   document.getElementById('medals-grid').innerHTML = medals.map((m, idx) => {
@@ -1397,11 +1434,40 @@ function getMedalRanking(key) {
             <div class="modal-value" style="color:#aaa">${Math.round(r.avg)}min</div>
           </div>`).join('');
     }
+    case 'hours': {
+      return NAMES.map(n=>{
+        const hrs=new Set(); eventsFor(n).forEach(e=>hrs.add(e.date.getHours()));
+        const missing=[]; for(let h=0;h<24;h++) if(!hrs.has(h)) missing.push(h);
+        return {name:n, count:hrs.size, missing};
+      }).sort((a,b)=>b.count-a.count).slice(0,top)
+        .map((r,i)=>`
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div style="flex:1">
+              <div class="modal-name" style="color:${COLORS[r.name]}">${r.name}</div>
+              <div class="modal-detail">${r.missing.length ? 'Missing: '+r.missing.map(h=>h+':00').join(', ') : 'Full 24h clock! 🏆'}</div>
+            </div>
+            <div class="modal-value" style="color:${COLORS[r.name]}">${r.count}</div>
+          </div>`).join('');
+    }
+    case 'constipated': {
+      return NAMES.map(n=>({name:n, ...longestGap(n)}))
+        .sort((a,b)=>b.ms-a.ms).slice(0,top)
+        .map((r,i)=>`
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div style="flex:1">
+              <div class="modal-name" style="color:${COLORS[r.name]}">${r.name}</div>
+              <div class="modal-detail">${r.from ? fmtDateTime(r.from)+' → '+fmtDateTime(r.to) : '—'}</div>
+            </div>
+            <div class="modal-value" style="color:${COLORS[r.name]}">${fmtDuration(r.ms)}</div>
+          </div>`).join('');
+    }
     default: return '<div class="modal-detail">No ranking available.</div>';
   }
 }
 
-const MEDAL_KEYS = ['1h','2h','3h','earlybird','nightowl','wildcard','partners','chain','lonewolf','weekend','onfire','machine'];
+const MEDAL_KEYS = ['1h','2h','3h','earlybird','nightowl','wildcard','partners','chain','lonewolf','weekend','onfire','machine','hours','constipated'];
 
 function openMedalModal(idx) {
   const medals = document.querySelectorAll('.medal-card');
