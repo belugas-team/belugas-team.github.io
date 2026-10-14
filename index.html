@@ -348,8 +348,8 @@ const PALETTE = [
   '#4d96ff','#c77dff','#ff9f1c','#e76f51'
 ];
 const HEADSTARTS = {
-  'Raúl': 45, 'Maldo': 44, 'Jesús': 45,
-  'Sendra': 28, 'Pablo': 21, 'Sergio': 25
+  'Raúl': 43, 'Maldo': 43, 'Jesús': 49,
+  'Sendra': 25, 'Pablo': 18, 'Sergio': 30
 };
 const nameCounts = {};
 const NAMES = [];
@@ -1037,6 +1037,23 @@ function earlyLateStats() {
   };
 }
 
+// Doblete: same person is both first and last of a poo day (needs ≥2 poos that day)
+function dobleteStats() {
+  const byDay = {};
+  events.forEach(e => { const k = pooDayKey(e.date); (byDay[k] = byDay[k] || []).push(e); });
+  const counts = {}, dates = {};
+  Object.entries(byDay).forEach(([k, d]) => {
+    if (d.length < 2) return;
+    d.sort((a,b) => a.date-b.date);
+    const n = d[0].name;
+    if (d[d.length-1].name !== n) return;
+    counts[n] = (counts[n]||0)+1;
+    (dates[n] = dates[n] || []).push(k);
+  });
+  const best = NAMES.reduce((b,n)=>(counts[n]||0)>(counts[b]||0)?n:b, NAMES[0]);
+  return {name:best, count:counts[best]||0, counts, dates};
+}
+
 function fmtHour(h) {
   const hh = Math.floor(h), mm = Math.round((h-hh)*60);
   const ampm = hh < 12 ? 'am' : 'pm';
@@ -1187,6 +1204,7 @@ function fmtDateTime(ms) {
 function renderMedals() {
   const w1 = bestInWindow(1), w2 = bestInWindow(2), w3 = bestInWindow(3);
   const {earlyBird, nightOwl} = earlyLateStats();
+  const doblete   = dobleteStats();
   const variable  = NAMES.reduce((b,n)=>{ const v=dailyStdDev(n); return v>b.v?{name:n,v}:b; },{name:'',v:-Infinity});
   const partners  = pooPartners();
   const chain     = chainStarter();
@@ -1206,6 +1224,7 @@ function renderMedals() {
     { icon:'💪', title:'3h Beast',        name:w3.name,       stat:`${w3.count} poos in 3h`,                      info:'Most poos logged within any single 3-hour window.' },
     { icon:'🌅', title:'Early Bird',      name:earlyBird.name,stat:`First of day ${earlyBird.count}×`,            info:'Who is most often the first person in the group to poop each day (day resets at 6am).' },
     { icon:'🌙', title:'Night Owl',       name:nightOwl.name, stat:`Last of day ${nightOwl.count}×`,              info:'Who is most often the last person in the group to poop each day (day resets at 6am).' },
+    { icon:'🌗', title:'Doblete',         name:doblete.name,  stat:`Early Bird + Night Owl ${doblete.count}×`,  info:'Days where the same person was both the first and the last to poop (day resets at 6am, min. 2 poos that day).' },
     { icon:'🎲', title:'Wild Card',       name:variable.name, stat:`±${variable.v.toFixed(1)} poos/day`,         info:'Highest std deviation of daily poo count — the most unpredictable pooper.' },
     { icon:'💑', title:'Poo Partners',    name:partnerName,   stat:`avg ${Math.round(partners.avgMins)}min apart`, info:'Pair with the smallest average closest-encounter gap on days they both pooped (min. 10 shared days).', color: partnerColor },
     { icon:'🔗', title:'Chain Reaction',  name:chain.name,    stat:`${(chain.rate*100).toFixed(0)}% trigger rate`,info:'% of their poos followed by someone else pooping within 1h. Min. 20 poos to qualify.' },
@@ -1322,6 +1341,20 @@ function getMedalRanking(key) {
           <div class="modal-row">
             ${rankBadgeHtml(i)}
             <div class="modal-name" style="color:${COLORS[r.name]};flex:1">${r.name}</div>
+            <div class="modal-value" style="color:${COLORS[r.name]}">${r.count}×</div>
+          </div>`).join('');
+    }
+    case 'doblete': {
+      const {counts, dates} = dobleteStats();
+      return NAMES.map(n=>({name:n,count:counts[n]||0,dates:(dates[n]||[]).slice().reverse()}))
+        .sort((a,b)=>b.count-a.count).slice(0,top)
+        .map((r,i)=>`
+          <div class="modal-row">
+            ${rankBadgeHtml(i)}
+            <div style="flex:1">
+              <div class="modal-name" style="color:${COLORS[r.name]}">${r.name}</div>
+              <div class="times-list">${r.dates.map(d=>`<span class="time-chip">${d.substring(8,10)}/${d.substring(5,7)}</span>`).join('')}</div>
+            </div>
             <div class="modal-value" style="color:${COLORS[r.name]}">${r.count}×</div>
           </div>`).join('');
     }
@@ -1467,7 +1500,7 @@ function getMedalRanking(key) {
   }
 }
 
-const MEDAL_KEYS = ['1h','2h','3h','earlybird','nightowl','wildcard','partners','chain','lonewolf','weekend','onfire','machine','hours','constipated'];
+const MEDAL_KEYS = ['1h','2h','3h','earlybird','nightowl','doblete','wildcard','partners','chain','lonewolf','weekend','onfire','machine','hours','constipated'];
 
 function openMedalModal(idx) {
   const medals = document.querySelectorAll('.medal-card');
